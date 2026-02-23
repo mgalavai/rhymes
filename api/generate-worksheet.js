@@ -13,6 +13,16 @@ function normalizeModelName(rawModelName) {
   return trimmed.startsWith('models/') ? trimmed.slice('models/'.length) : trimmed
 }
 
+function normalizeImageModelName(rawModelName) {
+  const normalized = normalizeModelName(rawModelName)
+  const aliasMap = {
+    'gemini-2.5-flash-preview-image': 'gemini-2.5-flash-image',
+    'gemini-3-pro-image': 'gemini-3-pro-image-preview',
+  }
+
+  return aliasMap[normalized] || normalized
+}
+
 function unique(items) {
   return Array.from(new Set(items.filter(Boolean)))
 }
@@ -218,6 +228,15 @@ function summarizeImageError(errorMessage) {
   }
 
   return message.slice(0, 220)
+}
+
+function summarizeMissingImageReasons(imageResults) {
+  return imageResults
+    .filter((item) => item && (!item.image || !item.image.imageDataUrl))
+    .slice(0, 3)
+    .map((item) =>
+      `${item.word}: ${summarizeImageError(item.image && item.image.error ? item.image.error : 'no image returned')}`,
+    )
 }
 
 async function callGeminiModel({ apiKey, model, body }) {
@@ -536,7 +555,13 @@ export default async function handler(req, res) {
     ...TEXT_MODEL_FALLBACK_ORDER,
   ])
 
-  const imageModelCandidates = unique([normalizeModelName(DEFAULT_IMAGE_MODEL) || 'gemini-2.5-flash-image'])
+  const requestedImageModel = normalizeImageModelName(DEFAULT_IMAGE_MODEL)
+  const imageModelCandidates = unique([
+    requestedImageModel || 'gemini-2.5-flash-image',
+    'gemini-2.5-flash-image',
+    'gemini-3-pro-image-preview',
+    'nano-banana-pro-preview',
+  ])
 
   if (singleWordRequest) {
     let targetWord = singleWordRequest
@@ -610,18 +635,7 @@ export default async function handler(req, res) {
     }
 
     const missingWords = uniqueWords.filter((word) => !wordToImage.has(word))
-    if (missingWords.length > 0) {
-      const missingReasons = imageResults
-        .filter((item) => item && (!item.image || !item.image.imageDataUrl))
-        .slice(0, 3)
-        .map((item) =>
-          `${item.word}: ${summarizeImageError(item.image && item.image.error ? item.image.error : 'no image returned')}`,
-        )
-
-      return res.status(502).json({
-        error: `Image generation failed for: ${missingWords.join(', ')}. Verify GEMINI_IMAGE_MODEL access (recommended: gemini-2.5-flash-image) and regenerate. Details: ${missingReasons.join(' || ')}`,
-      })
-    }
+    const missingReasons = summarizeMissingImageReasons(imageResults)
 
     const enrichedPairs = worksheet.pairs.map((pair) => {
       const leftImage = wordToImage.get(pair.left.word)
@@ -649,6 +663,10 @@ export default async function handler(req, res) {
       },
       usedTextModel: usedModel,
       usedImageModels: imageModelCandidates,
+      imageWarning:
+        missingWords.length > 0
+          ? `Some images could not be generated (${missingWords.join(', ')}). You can still print the worksheet and refresh individual cards later. Details: ${missingReasons.join(' || ')}`
+          : '',
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Worksheet generation failed.'

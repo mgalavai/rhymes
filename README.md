@@ -49,6 +49,6 @@ For Vercel, add the same variables in Project Settings -> Environment Variables.
 - `.env` files are ignored from git; use `.env.example` as template.
 - Model field accepts both `gemini-...` and `models/gemini-...`.
 - The API generates rhyme words with a text model, then generates isolated icons with an image model.
-- The app is image-only for illustrations (no SVG fallback). If image generation fails, the request fails with an explicit error.
-- If image-model entitlement is blocked, the API attempts a PNG emoji fallback (Twemoji) to keep worksheets usable.
-- If a model is unavailable or entitlement-limited, the API retries with fallback models.
+- If image generation is partially unavailable, the worksheet is still returned and missing images are shown as placeholders.
+- The API normalizes older image-model aliases (for example `gemini-2.5-flash-preview-image` -> `gemini-2.5-flash-image`).
+- If a model is unavailable or entitlement-limited, the API retries with fallback image models.

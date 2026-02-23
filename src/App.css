@@ -138,6 +138,16 @@
   font-weight: 700;
 }
 
+.warning-box {
+  margin: 0;
+  background: #fff4dc;
+  border: 2px solid #efcb85;
+  border-radius: 10px;
+  padding: 0.6rem;
+  color: #7c541a;
+  font-weight: 700;
+}
+
 .help-text {
   margin: 0;
   color: var(--ink-soft);
@@ -330,6 +340,20 @@
   max-height: 100%;
   object-fit: contain;
   display: block;
+}
+
+.image-missing {
+  width: min(100%, 40mm);
+  aspect-ratio: 1 / 1;
+  border: 2px dashed #cfbe9a;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: #786b53;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  padding: 0.4rem;
 }
 
 .worksheet-footer {

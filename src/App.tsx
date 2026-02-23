@@ -35,6 +35,12 @@ type WorksheetData = {
   pairs: RhymePair[]
 }
 
+type GenerateWorksheetPayload = {
+  error?: string
+  worksheet?: unknown
+  imageWarning?: string
+}
+
 type ColumnCard = {
   id: string
   pairIndex: number
@@ -155,13 +161,6 @@ function normalizeWorksheet(candidate: unknown, language: string, pairCount: num
     }
   })
 
-  const missingImages = pairs.filter((pair) => !pair.left.imageDataUrl || !pair.right.imageDataUrl)
-  if (missingImages.length > 0) {
-    throw new Error(
-      'Image generation did not return child-illustration images for all items. Regenerate and ensure image model access.',
-    )
-  }
-
   return {
     title:
       typeof raw.title === 'string' && raw.title.trim()
@@ -182,7 +181,7 @@ async function generateWorksheetWithGemini({
   language,
   pairCount,
   topic,
-}: GenerateParams): Promise<WorksheetData> {
+}: GenerateParams): Promise<{ worksheet: WorksheetData; imageWarning: string }> {
   if (!model.trim()) {
     throw new Error('Model name is required.')
   }
@@ -200,12 +199,7 @@ async function generateWorksheetWithGemini({
     }),
   })
 
-  const payload = (await response.json().catch(() => null)) as
-    | {
-        error?: string
-        worksheet?: unknown
-      }
-    | null
+  const payload = (await response.json().catch(() => null)) as GenerateWorksheetPayload | null
 
   if (!response.ok) {
     if (response.status === 404) {
@@ -215,7 +209,11 @@ async function generateWorksheetWithGemini({
     throw new Error(payload?.error ?? `Worksheet generation failed (${response.status}).`)
   }
 
-  return normalizeWorksheet(payload?.worksheet, language, pairCount)
+  return {
+    worksheet: normalizeWorksheet(payload?.worksheet, language, pairCount),
+    imageWarning:
+      typeof payload?.imageWarning === 'string' ? payload.imageWarning.trim() : '',
+  }
 }
 
 function toColumnCards(worksheet: WorksheetData): { left: ColumnCard[]; right: ColumnCard[] } {
@@ -250,10 +248,12 @@ function App() {
   const [isLoading, setIsLoading] = useState(false)
   const [refreshingCardId, setRefreshingCardId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [warning, setWarning] = useState('')
 
   const handleGenerate = async () => {
     setIsLoading(true)
     setError('')
+    setWarning('')
 
     try {
       const generated = await generateWorksheetWithGemini({
@@ -263,8 +263,9 @@ function App() {
         topic,
       })
 
-      setWorksheet(generated)
-      setCards(toColumnCards(generated))
+      setWorksheet(generated.worksheet)
+      setCards(toColumnCards(generated.worksheet))
+      setWarning(generated.imageWarning)
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : 'Generation failed.'
       setError(message)
@@ -433,7 +434,13 @@ function App() {
                           >
                             <RefreshIcon />
                           </button>
-                          <img src={card.imageDataUrl} alt="" loading="lazy" decoding="async" />
+                          {card.imageDataUrl ? (
+                            <img src={card.imageDataUrl} alt="" loading="lazy" decoding="async" />
+                          ) : (
+                            <div className="image-missing" role="img" aria-label="Image unavailable">
+                              image unavailable
+                            </div>
+                          )}
                         </div>
                       </div>
                       <strong>{card.word}</strong>
@@ -456,7 +463,13 @@ function App() {
                           >
                             <RefreshIcon />
                           </button>
-                          <img src={card.imageDataUrl} alt="" loading="lazy" decoding="async" />
+                          {card.imageDataUrl ? (
+                            <img src={card.imageDataUrl} alt="" loading="lazy" decoding="async" />
+                          ) : (
+                            <div className="image-missing" role="img" aria-label="Image unavailable">
+                              image unavailable
+                            </div>
+                          )}
                         </div>
                       </div>
                       <strong>{card.word}</strong>
@@ -533,6 +546,7 @@ function App() {
         </div>
 
         {error ? <p className="error-box">{error}</p> : null}
+        {!error && warning ? <p className="warning-box">{warning}</p> : null}
         <p className="help-text">
           API key is server-side only (<code>GEMINI_API_KEY</code>). Text generation uses
           <code>{DEFAULT_MODEL}</code>; icons use <code>GEMINI_IMAGE_MODEL</code> (default:
