@@ -278,15 +278,81 @@ function App() {
 
   return (
     <div className="app-shell">
-      <header className="hero no-print">
-        <h1>Rhyming Sheet Builder</h1>
-        <p>
-          Generate one printable worksheet with {pairCount * 2} illustrated cards. Kids draw lines
-          between rhyming words.
-        </p>
-      </header>
+      <main className="workspace">
+        <header className="hero no-print">
+          <h1>Rhyming Sheet Builder</h1>
+          <p>
+            Generate one printable worksheet with {pairCount * 2} illustrated cards. Kids draw
+            lines between rhyming words.
+          </p>
+        </header>
 
-      <section className="control-panel no-print">
+        <section className="sheet-frame" aria-live="polite">
+          {worksheet && cards ? (
+            <article className="worksheet-page">
+              <div className="worksheet-header">
+                <h2>{worksheet.title}</h2>
+                <p>{worksheet.instruction}</p>
+                <span>
+                  Language: {worksheet.language} · Cards: {worksheet.pairs.length * 2}
+                </span>
+              </div>
+
+              <div className="worksheet-columns">
+                <ol className="items-column" aria-label="Column A">
+                  {cards.left.map((card) => (
+                    <li key={card.id} className="sheet-item">
+                      <div className="item-illustration">
+                        <div className="svg-box">
+                          <img src={card.imageDataUrl} alt="" loading="lazy" decoding="async" />
+                        </div>
+                      </div>
+                      <strong>{card.word}</strong>
+                    </li>
+                  ))}
+                </ol>
+
+                <ol className="items-column" aria-label="Column B">
+                  {cards.right.map((card) => (
+                    <li key={card.id} className="sheet-item">
+                      <div className="item-illustration">
+                        <div className="svg-box">
+                          <img src={card.imageDataUrl} alt="" loading="lazy" decoding="async" />
+                        </div>
+                      </div>
+                      <strong>{card.word}</strong>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+
+              <footer className="worksheet-footer">
+                Draw lines from Column A to Column B to match rhymes.
+              </footer>
+            </article>
+          ) : (
+            <div className="empty-sheet">
+              <h2>No worksheet yet</h2>
+              <p>Pick language + topic, then click Generate Page.</p>
+            </div>
+          )}
+        </section>
+
+        {showAnswers && answerPairs.length > 0 ? (
+          <section className="answer-key no-print">
+            <h3>Answer Key</h3>
+            <ul>
+              {answerPairs.map((answer) => (
+                <li key={`${answer.pairIndex}-${answer.leftWord}`}>
+                  {answer.leftWord} ↔ {answer.rightWord}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+      </main>
+
+      <aside className="control-panel no-print">
         <label>
           Model
           <input
@@ -352,71 +418,7 @@ function App() {
           <code>gemini-2.5-flash-image</code>). If image entitlement is blocked, PNG emoji fallback
           is used.
         </p>
-      </section>
-
-      <section className="sheet-frame" aria-live="polite">
-        {worksheet && cards ? (
-          <article className="worksheet-page">
-            <div className="worksheet-header">
-              <h2>{worksheet.title}</h2>
-              <p>{worksheet.instruction}</p>
-              <span>
-                Language: {worksheet.language} · Cards: {worksheet.pairs.length * 2}
-              </span>
-            </div>
-
-            <div className="worksheet-columns">
-              <ol className="items-column" aria-label="Column A">
-                {cards.left.map((card, index) => (
-                  <li key={card.id} className="sheet-item">
-                    <span className="item-index">A{index + 1}</span>
-                    <div className="item-illustration">
-                      <div className="svg-box">
-                        <img src={card.imageDataUrl} alt="" loading="lazy" decoding="async" />
-                      </div>
-                    </div>
-                    <strong>{card.word}</strong>
-                  </li>
-                ))}
-              </ol>
-
-              <ol className="items-column" aria-label="Column B">
-                {cards.right.map((card, index) => (
-                  <li key={card.id} className="sheet-item">
-                    <span className="item-index">B{index + 1}</span>
-                    <div className="item-illustration">
-                      <div className="svg-box">
-                        <img src={card.imageDataUrl} alt="" loading="lazy" decoding="async" />
-                      </div>
-                    </div>
-                    <strong>{card.word}</strong>
-                  </li>
-                ))}
-              </ol>
-            </div>
-
-            <footer className="worksheet-footer">Draw lines from Column A to Column B to match rhymes.</footer>
-          </article>
-        ) : (
-          <div className="empty-sheet">
-            <h2>No worksheet yet</h2>
-            <p>Pick language + topic, then click Generate Page.</p>
-          </div>
-        )}
-      </section>
-
-      {showAnswers && answerPairs.length > 0 ? (
-        <section className="answer-key no-print">
-          <h3>Answer Key</h3>
-          <ul>
-            {answerPairs.map((answer) => (
-              <li key={`${answer.pairIndex}-${answer.leftWord}`}>
-                {answer.leftWord} ↔ {answer.rightWord}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      </aside>
     </div>
   )
 }
