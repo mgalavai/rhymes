@@ -1,0 +1,25 @@
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Nunito:wght@500;700&display=swap');
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+body {
+  font-family: 'Nunito', sans-serif;
+  color: #1f1f1f;
+  background:
+    radial-gradient(circle at 10% 15%, rgb(255 248 226 / 95%), rgb(245 235 212 / 85%) 58%, transparent 70%),
+    linear-gradient(135deg, #f3e8d2, #efe3cb 55%, #f6edd8);
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
