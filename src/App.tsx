@@ -278,14 +278,6 @@ function App() {
   return (
     <div className="app-shell">
       <main className="workspace">
-        <header className="hero no-print">
-          <h1>Rhyming Sheet Builder</h1>
-          <p>
-            Generate one printable worksheet with {pairCount * 2} illustrated cards. Kids draw
-            lines between rhyming words.
-          </p>
-        </header>
-
         <section className="sheet-frame" aria-live="polite">
           {worksheet && cards ? (
             <article className="worksheet-page">
@@ -352,6 +344,14 @@ function App() {
       </main>
 
       <aside className="control-panel no-print">
+        <header className="panel-hero">
+          <h1>Rhyming Sheet Builder</h1>
+          <p>
+            Generate one printable worksheet with {pairCount * 2} illustrated cards. Kids draw
+            lines between rhyming words.
+          </p>
+        </header>
+
         <h2 className="panel-title">Worksheet Controls</h2>
 
         <label>

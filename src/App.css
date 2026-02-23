@@ -26,31 +26,8 @@
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: 0.8rem;
-}
-
-.hero {
-  padding: 0.9rem 1.1rem 0.85rem;
-  border: 2px solid var(--line);
-  border-radius: 14px;
-  background:
-    linear-gradient(120deg, #f9efdc, #fff7ea),
-    repeating-linear-gradient(45deg, rgb(217 204 179 / 16%), rgb(217 204 179 / 16%) 10px, transparent 10px, transparent 20px);
-  box-shadow: 0 8px 24px rgb(72 49 17 / 10%);
-}
-
-.hero h1 {
-  margin: 0;
-  font-family: 'Baloo 2', cursive;
-  font-size: clamp(1.6rem, 2.5vw, 2.4rem);
-  color: var(--ink);
-}
-
-.hero p {
-  margin: 0.2rem 0 0;
-  color: var(--ink-soft);
-  font-size: clamp(0.96rem, 1.35vw, 1.06rem);
+  grid-template-rows: 1fr auto;
+  gap: 0.75rem;
 }
 
 .control-panel {
@@ -69,6 +46,32 @@
   box-shadow: 0 10px 22px rgb(72 49 17 / 12%);
 }
 
+.panel-hero {
+  padding: 0.74rem 0.78rem 0.7rem;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  background:
+    linear-gradient(120deg, #f9efdc, #fff7ea),
+    repeating-linear-gradient(45deg, rgb(217 204 179 / 16%), rgb(217 204 179 / 16%) 10px, transparent 10px, transparent 20px);
+}
+
+.panel-hero h1 {
+  margin: 0;
+  font-family: 'Baloo 2', cursive;
+  font-size: clamp(1.3rem, 2.1vw, 1.85rem);
+  line-height: 1.02;
+  color: var(--ink);
+  text-align: left;
+}
+
+.panel-hero p {
+  margin: 0.3rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+  line-height: 1.34;
+  text-align: left;
+}
+
 .control-panel label {
   font-weight: 700;
   color: var(--ink);
@@ -79,7 +82,7 @@
 .panel-title {
   margin: 0;
   font-family: 'Baloo 2', cursive;
-  font-size: 1.45rem;
+  font-size: 1.28rem;
   line-height: 1;
   letter-spacing: 0.01em;
   color: #332718;
@@ -309,7 +312,7 @@
 
   .workspace {
     order: 2;
-    grid-template-rows: auto auto auto;
+    grid-template-rows: auto auto;
   }
 
   .control-panel {
