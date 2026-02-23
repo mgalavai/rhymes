@@ -354,9 +354,6 @@ function App() {
               <div className="worksheet-header">
                 <h2>{worksheet.title}</h2>
                 <p>{worksheet.instruction}</p>
-                <span>
-                  Language: {worksheet.language} · Cards: {worksheet.pairs.length * 2}
-                </span>
               </div>
 
               <div className="worksheet-columns">
@@ -408,7 +405,7 @@ function App() {
               </div>
 
               <footer className="worksheet-footer">
-                Draw lines from Column A to Column B to match rhymes.
+                Draw lines to match rhymes.
               </footer>
             </article>
           ) : (
