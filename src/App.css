@@ -250,33 +250,34 @@
 .item-illustration {
   width: 100%;
   min-height: 0;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
 }
 
 .svg-box {
-  width: 100%;
+  width: min(100%, 42mm);
   height: 100%;
+  min-height: 0;
   position: relative;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
 }
 
 .refresh-image-btn {
   position: absolute;
-  top: 0.35rem;
-  right: 0.35rem;
+  top: 0.2rem;
+  right: 0.2rem;
   z-index: 2;
-  width: 1.8rem;
-  height: 1.8rem;
+  width: 2.25rem;
+  height: 2.25rem;
   border-radius: 999px;
-  border: 2px solid rgb(54 46 31 / 35%);
-  background: rgb(255 255 255 / 85%);
-  color: #2d2417;
-  font-size: 1rem;
-  line-height: 1;
+  border: 2px solid rgb(54 46 31 / 30%);
+  background: rgb(255 255 255 / 92%);
+  color: #2b2418;
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -294,6 +295,11 @@
   border-color: rgb(54 46 31 / 65%);
 }
 
+.refresh-image-btn svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
 .sheet-item:hover .refresh-image-btn,
 .sheet-item:focus-within .refresh-image-btn,
 .refresh-image-btn.is-loading {
@@ -305,7 +311,7 @@
   cursor: wait;
 }
 
-.refresh-image-btn.is-loading {
+.refresh-image-btn.is-loading svg {
   animation: refresh-spin 1s linear infinite;
 }
 

@@ -50,6 +50,30 @@ type GenerateParams = {
   topic: string
 }
 
+function RefreshIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="lucide lucide-refresh-ccw-icon lucide-refresh-ccw"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+      <path d="M16 16h5v5" />
+    </svg>
+  )
+}
+
 function shuffle<T>(items: T[]): T[] {
   const copy = [...items]
 
@@ -254,68 +278,128 @@ function App() {
   }
 
   const handleRefreshCardImage = async (card: ColumnCard) => {
-    if (isLoading || refreshingCardId) {
+    if (isLoading || refreshingCardId || !cards) {
       return
     }
 
+    const pairedCard =
+      card.side === 'left'
+        ? cards.right.find((item) => item.pairIndex === card.pairIndex)
+        : cards.left.find((item) => item.pairIndex === card.pairIndex)
+
+    const pairedWord = pairedCard ? pairedCard.word : ''
     setRefreshingCardId(card.id)
     setError('')
 
     try {
-      const response = await fetch('/api/generate-worksheet', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          word: card.word,
-          language,
-          topic,
-          variationHint: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        }),
-      })
+      let didChangeCard = false
 
-      const payload = (await response.json().catch(() => null)) as
-        | {
-            error?: string
-            imageDataUrl?: unknown
-          }
-        | null
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const response = await fetch('/api/generate-worksheet', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            word: card.word,
+            pairedWord,
+            replaceWord: true,
+            language,
+            topic,
+            variationHint: `${Date.now()}-${attempt}-${Math.random().toString(36).slice(2, 8)}`,
+          }),
+        })
 
-      if (!response.ok) {
-        throw new Error(payload?.error ?? `Could not refresh "${card.word}" image.`)
-      }
+        const payload = (await response.json().catch(() => null)) as
+          | {
+              error?: string
+              imageDataUrl?: unknown
+              word?: unknown
+            }
+          | null
 
-      const nextImageDataUrl = sanitizeImageDataUrl(payload?.imageDataUrl)
-      if (!nextImageDataUrl) {
-        throw new Error(`Received invalid image data for "${card.word}".`)
-      }
-
-      setCards((previous) => {
-        if (!previous) {
-          return previous
+        if (!response.ok) {
+          throw new Error(payload?.error ?? `Could not refresh "${card.word}" card.`)
         }
 
-        const patchItems = (items: ColumnCard[]) =>
-          items.map((item) =>
-            item.id === card.id
-              ? {
-                  ...item,
-                  imageDataUrl: nextImageDataUrl,
+        const nextImageDataUrl = sanitizeImageDataUrl(payload?.imageDataUrl)
+        const nextWord = cleanWord(payload?.word ?? card.word)
+
+        if (!nextImageDataUrl) {
+          throw new Error(`Received invalid image data for "${card.word}".`)
+        }
+
+        if (nextImageDataUrl !== card.imageDataUrl || nextWord !== card.word) {
+          setCards((previous) => {
+            if (!previous) {
+              return previous
+            }
+
+            const patchItems = (items: ColumnCard[]) =>
+              items.map((item) =>
+                item.id === card.id
+                  ? {
+                      ...item,
+                      word: nextWord,
+                      imageDataUrl: nextImageDataUrl,
+                    }
+                  : item,
+              )
+
+            return {
+              left: patchItems(previous.left),
+              right: patchItems(previous.right),
+            }
+          })
+
+          setWorksheet((previous) => {
+            if (!previous) {
+              return previous
+            }
+
+            return {
+              ...previous,
+              pairs: previous.pairs.map((pair, pairIndex) => {
+                if (pairIndex !== card.pairIndex) {
+                  return pair
                 }
-              : item,
-          )
 
-        return {
-          left: patchItems(previous.left),
-          right: patchItems(previous.right),
+                if (card.side === 'left') {
+                  return {
+                    ...pair,
+                    left: {
+                      ...pair.left,
+                      word: nextWord,
+                      imageDataUrl: nextImageDataUrl,
+                    },
+                  }
+                }
+
+                return {
+                  ...pair,
+                  right: {
+                    ...pair.right,
+                    word: nextWord,
+                    imageDataUrl: nextImageDataUrl,
+                  },
+                }
+              }),
+            }
+          })
+
+          didChangeCard = true
+          break
         }
-      })
+      }
+
+      if (!didChangeCard) {
+        throw new Error(`No alternative returned for "${card.word}" yet. Try refresh again.`)
+      }
     } catch (caughtError) {
       const message =
         caughtError instanceof Error
           ? caughtError.message
-          : `Could not refresh "${card.word}" image right now.`
+          : `Could not refresh "${card.word}" right now.`
       setError(message)
     } finally {
       setRefreshingCardId(null)
@@ -344,10 +428,10 @@ function App() {
                             className={`refresh-image-btn ${refreshingCardId === card.id ? 'is-loading' : ''}`}
                             onClick={() => void handleRefreshCardImage(card)}
                             disabled={isLoading || refreshingCardId !== null}
-                            aria-label={`Refresh image for ${card.word}`}
-                            title={`Refresh image for ${card.word}`}
+                            aria-label={`Replace card for ${card.word}`}
+                            title={`Replace card for ${card.word}`}
                           >
-                            ⟳
+                            <RefreshIcon />
                           </button>
                           <img src={card.imageDataUrl} alt="" loading="lazy" decoding="async" />
                         </div>
@@ -367,10 +451,10 @@ function App() {
                             className={`refresh-image-btn ${refreshingCardId === card.id ? 'is-loading' : ''}`}
                             onClick={() => void handleRefreshCardImage(card)}
                             disabled={isLoading || refreshingCardId !== null}
-                            aria-label={`Refresh image for ${card.word}`}
-                            title={`Refresh image for ${card.word}`}
+                            aria-label={`Replace card for ${card.word}`}
+                            title={`Replace card for ${card.word}`}
                           >
-                            ⟳
+                            <RefreshIcon />
                           </button>
                           <img src={card.imageDataUrl} alt="" loading="lazy" decoding="async" />
                         </div>
@@ -452,8 +536,7 @@ function App() {
         <p className="help-text">
           API key is server-side only (<code>GEMINI_API_KEY</code>). Text generation uses
           <code>{DEFAULT_MODEL}</code>; icons use <code>GEMINI_IMAGE_MODEL</code> (default:
-          <code>gemini-2.5-flash-image</code>). If image entitlement is blocked, PNG emoji fallback
-          is used.
+          <code>gemini-2.5-flash-image</code>).
         </p>
       </aside>
     </div>
