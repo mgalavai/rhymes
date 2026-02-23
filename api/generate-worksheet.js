@@ -2,6 +2,68 @@ const DEFAULT_TEXT_MODEL = process.env.GEMINI_MODEL || 'gemini-3.1-pro-preview'
 const DEFAULT_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image'
 
 const TEXT_MODEL_FALLBACK_ORDER = ['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash']
+const EMOJI_FALLBACK = '🧸'
+const TWEMOJI_PNG_BASE = 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72'
+
+const WORD_TO_EMOJI_HINTS = {
+  cat: '🐱',
+  dog: '🐶',
+  fox: '🦊',
+  frog: '🐸',
+  bear: '🐻',
+  hen: '🐔',
+  chicken: '🐔',
+  bee: '🐝',
+  goat: '🐐',
+  fish: '🐟',
+  duck: '🦆',
+  mouse: '🐭',
+  rat: '🐭',
+  rabbit: '🐰',
+  hare: '🐰',
+  pig: '🐷',
+  cow: '🐮',
+  horse: '🐴',
+  lion: '🦁',
+  tiger: '🐯',
+  monkey: '🐵',
+  sheep: '🐑',
+  bird: '🐦',
+  hat: '🧢',
+  cap: '🧢',
+  pen: '🖊️',
+  pencil: '✏️',
+  book: '📘',
+  box: '📦',
+  log: '🪵',
+  chair: '🪑',
+  table: '🪑',
+  house: '🏠',
+  home: '🏠',
+  tree: '🌳',
+  flower: '🌸',
+  sun: '☀️',
+  moon: '🌙',
+  star: '⭐',
+  boat: '⛵',
+  ship: '🚢',
+  car: '🚗',
+  bus: '🚌',
+  truck: '🚚',
+  train: '🚂',
+  bike: '🚲',
+  ball: '⚽',
+  cup: '🥤',
+  mug: '☕',
+  cake: '🍰',
+  bread: '🍞',
+  apple: '🍎',
+  pear: '🍐',
+  grape: '🍇',
+  banana: '🍌',
+  orange: '🍊',
+  peach: '🍑',
+}
 
 function normalizeModelName(rawModelName) {
   const trimmed = String(rawModelName || '').trim()
@@ -59,6 +121,20 @@ function buildImagePrompt(word, language, topic) {
   ].join('\n')
 }
 
+function buildEmojiMapPrompt(words, language, topic) {
+  return [
+    `For each ${language} word below, choose one representative emoji for a child worksheet.`,
+    `Topic context: ${topic || 'animals and everyday objects'}.`,
+    'Return JSON only:',
+    '{"items":[{"word":"cat","emoji":"🐱"}]}',
+    'Rules:',
+    '- Use exactly one emoji per word.',
+    '- Keep the same words and order.',
+    '- No markdown, no extra text.',
+    `Words: ${words.join(', ')}`,
+  ].join('\n')
+}
+
 function extractJsonText(rawText) {
   const trimmed = String(rawText || '').trim()
 
@@ -93,6 +169,45 @@ function cleanWord(rawWord) {
     .replace(/\s+/g, ' ')
 
   return cleaned || 'word'
+}
+
+function emojiToTwemojiFilename(emoji) {
+  return Array.from(String(emoji))
+    .map((char) => char.codePointAt(0).toString(16))
+    .join('-')
+    .replace(/-fe0f/g, '')
+}
+
+function guessEmojiForWord(word) {
+  const lowerWord = cleanWord(word).toLowerCase()
+  const direct = WORD_TO_EMOJI_HINTS[lowerWord]
+  if (direct) {
+    return direct
+  }
+
+  const fragmentMatch = Object.entries(WORD_TO_EMOJI_HINTS).find(([fragment]) =>
+    lowerWord.includes(fragment),
+  )
+  if (fragmentMatch) {
+    return fragmentMatch[1]
+  }
+
+  return EMOJI_FALLBACK
+}
+
+async function fetchImageAsDataUrl(url) {
+  try {
+    const response = await fetch(url)
+    if (!response.ok) {
+      return null
+    }
+
+    const mimeType = response.headers.get('content-type') || 'image/png'
+    const imageBuffer = Buffer.from(await response.arrayBuffer())
+    return `data:${mimeType};base64,${imageBuffer.toString('base64')}`
+  } catch {
+    return null
+  }
 }
 
 function normalizeWordWorksheet(candidate, language, pairCount) {
@@ -399,6 +514,84 @@ async function generateWordImage({ apiKey, word, language, topic, candidateModel
   }
 }
 
+async function generateEmojiMap({ apiKey, words, language, topic, candidateModels }) {
+  for (const modelName of candidateModels) {
+    const { response, payload } = await callGeminiModel({
+      apiKey,
+      model: modelName,
+      body: {
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: buildEmojiMapPrompt(words, language, topic) }],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.2,
+        },
+      },
+    })
+
+    if (!response.ok) {
+      continue
+    }
+
+    try {
+      const modelText = extractTextFromPayload(payload)
+      const json = JSON.parse(extractJsonText(modelText))
+      const items = Array.isArray(json && json.items) ? json.items : []
+      const emojiMap = new Map()
+
+      for (const item of items) {
+        const word = item && typeof item.word === 'string' ? cleanWord(item.word) : ''
+        const emoji = item && typeof item.emoji === 'string' ? item.emoji.trim() : ''
+        if (!word || !emoji) {
+          continue
+        }
+        emojiMap.set(word.toLowerCase(), emoji)
+      }
+
+      return emojiMap
+    } catch {
+      continue
+    }
+  }
+
+  return new Map()
+}
+
+async function generateEmojiFallbackImages({ apiKey, words, language, topic, candidateModels }) {
+  const mappedEmojis = await generateEmojiMap({
+    apiKey,
+    words,
+    language,
+    topic,
+    candidateModels,
+  })
+
+  const results = new Map()
+  for (const word of words) {
+    const normalizedWord = cleanWord(word)
+    const emoji = mappedEmojis.get(normalizedWord.toLowerCase()) || guessEmojiForWord(normalizedWord)
+    const emojiFilename = emojiToTwemojiFilename(emoji)
+    const twemojiUrl = `${TWEMOJI_PNG_BASE}/${emojiFilename}.png`
+    const imageDataUrl = await fetchImageAsDataUrl(twemojiUrl)
+    if (!imageDataUrl) {
+      continue
+    }
+
+    results.set(normalizedWord, {
+      imageDataUrl,
+      mimeType: 'image/png',
+      provider: 'twemoji',
+      emoji,
+    })
+  }
+
+  return results
+}
+
 async function mapWithConcurrency(items, concurrency, mapper) {
   const results = new Array(items.length)
   let nextIndex = 0
@@ -487,6 +680,21 @@ export default async function handler(req, res) {
 
     const missingWords = uniqueWords.filter((word) => !wordToImage.has(word))
     if (missingWords.length > 0) {
+      const emojiFallbackImages = await generateEmojiFallbackImages({
+        apiKey,
+        words: missingWords,
+        language,
+        topic,
+        candidateModels: textModelCandidates,
+      })
+
+      for (const [word, image] of emojiFallbackImages.entries()) {
+        wordToImage.set(word, image)
+      }
+    }
+
+    const remainingMissingWords = uniqueWords.filter((word) => !wordToImage.has(word))
+    if (remainingMissingWords.length > 0) {
       const missingReasons = imageResults
         .filter((item) => item && (!item.image || !item.image.imageDataUrl))
         .slice(0, 3)
@@ -495,7 +703,7 @@ export default async function handler(req, res) {
         )
 
       return res.status(502).json({
-        error: `Image generation failed for: ${missingWords.join(', ')}. Verify GEMINI_IMAGE_MODEL access (recommended: gemini-2.5-flash-image) and regenerate. Details: ${missingReasons.join(' || ')}`,
+        error: `Image generation failed for: ${remainingMissingWords.join(', ')}. Verify GEMINI_IMAGE_MODEL access (recommended: gemini-2.5-flash-image). PNG emoji fallback was attempted. Details: ${missingReasons.join(' || ')}`,
       })
     }
 
@@ -525,6 +733,7 @@ export default async function handler(req, res) {
       },
       usedTextModel: usedModel,
       usedImageModels: imageModelCandidates,
+      imageFallback: 'twemoji-png',
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Worksheet generation failed.'

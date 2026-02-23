@@ -349,7 +349,8 @@ function App() {
         <p className="help-text">
           API key is server-side only (<code>GEMINI_API_KEY</code>). Word pairs use the selected
           text model; icons use <code>GEMINI_IMAGE_MODEL</code> (default:
-          <code>gemini-2.5-flash-image</code>).
+          <code>gemini-2.5-flash-image</code>). If image entitlement is blocked, PNG emoji fallback
+          is used.
         </p>
       </section>
 
