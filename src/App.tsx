@@ -100,6 +100,82 @@ function cleanWord(rawWord: unknown): string {
   return cleaned || 'word'
 }
 
+type SvgViewBox = {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+function parseViewBox(value: string | null): SvgViewBox {
+  if (!value) {
+    return { x: 0, y: 0, width: 100, height: 100 }
+  }
+
+  const parts = value
+    .trim()
+    .split(/[\s,]+/)
+    .map((entry) => Number(entry))
+
+  if (parts.length !== 4 || parts.some((entry) => !Number.isFinite(entry))) {
+    return { x: 0, y: 0, width: 100, height: 100 }
+  }
+
+  const [, , width, height] = parts
+  if (width <= 0 || height <= 0) {
+    return { x: 0, y: 0, width: 100, height: 100 }
+  }
+
+  return { x: parts[0], y: parts[1], width, height }
+}
+
+function getNumericAttribute(element: Element, attributeName: string, fallbackValue: number): number {
+  const raw = element.getAttribute(attributeName)
+  if (raw === null || raw.trim() === '') {
+    return fallbackValue
+  }
+
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) ? parsed : fallbackValue
+}
+
+function isLikelyBackgroundRect(element: Element, viewBox: SvgViewBox): boolean {
+  if (element.tagName.toLowerCase() !== 'rect') {
+    return false
+  }
+
+  const stroke = (element.getAttribute('stroke') || '').trim().toLowerCase()
+  if (stroke && stroke !== 'none') {
+    return false
+  }
+
+  const fill = (element.getAttribute('fill') || '').trim().toLowerCase()
+  if (!fill || fill === 'none' || fill === 'transparent') {
+    return false
+  }
+
+  const fillOpacity = getNumericAttribute(element, 'fill-opacity', 1)
+  if (fillOpacity < 0.08) {
+    return false
+  }
+
+  const rectX = getNumericAttribute(element, 'x', viewBox.x)
+  const rectY = getNumericAttribute(element, 'y', viewBox.y)
+  const rectWidth = getNumericAttribute(element, 'width', viewBox.width)
+  const rectHeight = getNumericAttribute(element, 'height', viewBox.height)
+
+  if (rectWidth <= 0 || rectHeight <= 0) {
+    return false
+  }
+
+  const coversMostWidth = rectWidth >= viewBox.width * 0.95
+  const coversMostHeight = rectHeight >= viewBox.height * 0.95
+  const nearLeft = rectX <= viewBox.x + viewBox.width * 0.05
+  const nearTop = rectY <= viewBox.y + viewBox.height * 0.05
+
+  return coversMostWidth && coversMostHeight && nearLeft && nearTop
+}
+
 function sanitizeSvg(rawSvg: unknown): string {
   if (typeof rawSvg !== 'string' || !rawSvg.includes('<svg')) {
     return FALLBACK_SVG
@@ -154,6 +230,12 @@ function sanitizeSvg(rawSvg: unknown): string {
   if (!root.getAttribute('viewBox')) {
     root.setAttribute('viewBox', '0 0 100 100')
   }
+
+  const viewBox = parseViewBox(root.getAttribute('viewBox'))
+  const backgroundRects = Array.from(root.querySelectorAll('rect')).filter((element) =>
+    isLikelyBackgroundRect(element, viewBox),
+  )
+  backgroundRects.forEach((element) => element.remove())
 
   return new XMLSerializer().serializeToString(root)
 }

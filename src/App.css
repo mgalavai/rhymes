@@ -225,10 +225,11 @@
 .svg-box svg {
   width: 100%;
   height: 100%;
-  stroke: #181818;
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  overflow: visible;
+}
+
+.svg-box svg * {
+  vector-effect: non-scaling-stroke;
 }
 
 .connector-dot {

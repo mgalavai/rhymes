@@ -39,8 +39,13 @@ function buildPrompt(language, pairCount, topic) {
     'Requirements:',
     '- Words must be concrete, child-friendly nouns and should rhyme clearly in the target language.',
     '- Keep words short when possible and avoid offensive or abstract vocabulary.',
-    '- Each SVG must be a simple black-and-white line drawing, no text labels, no background, printable.',
+    '- Each SVG must be high-quality vector clipart with a transparent background and isolated single object.',
+    '- Style target: clean educational icon (not stick figure, not scribble), balanced geometry, child-friendly look.',
+    '- Include 3-8 harmonious flat colors plus subtle darker outlines where useful; avoid gradients and filters.',
+    '- Keep the object centered and large (roughly 70-85% of canvas), with no scene elements or decorative background.',
+    '- The SVG must contain no text labels and no frame/background shape behind the object.',
     '- Each SVG should use viewBox="0 0 100 100" and contain one object/animal only.',
+    '- Prefer simple closed shapes and smooth paths so output remains crisp when printed.',
     '- Do not include markdown fences or explanations, output JSON only.',
   ].join('\n')
 }
@@ -191,7 +196,7 @@ async function callGeminiModel({ apiKey, model, language, pairCount, topic }) {
         ],
         generationConfig: {
           responseMimeType: 'application/json',
-          temperature: 0.75,
+          temperature: 0.6,
         },
       }),
     },
