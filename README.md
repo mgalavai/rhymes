@@ -30,7 +30,7 @@ If you run `npm run dev`, only the Vite frontend starts (no `/api` serverless ro
 ## Environment Variables
 
 - `GEMINI_API_KEY`: your Gemini API key (server-side only)
-- `GEMINI_MODEL`: optional text model for rhyme-word generation (default: `gemini-2.5-flash`)
+- `GEMINI_MODEL`: optional text model for rhyme-word generation (default: `gemini-3.1-pro-preview`)
 - `GEMINI_IMAGE_MODEL`: optional image model for icon generation (default: `gemini-2.5-flash-image`)
 
 For Vercel, add the same variables in Project Settings -> Environment Variables.
@@ -38,7 +38,7 @@ For Vercel, add the same variables in Project Settings -> Environment Variables.
 ## How To Use
 
 1. Add `GEMINI_API_KEY`, optional `GEMINI_MODEL`, and optional `GEMINI_IMAGE_MODEL` in `.env` or Vercel env settings.
-2. Set text model in UI (default is `gemini-2.5-flash`).
+2. Set text model in UI (default is `gemini-3.1-pro-preview`).
 3. Choose language, card count (8 or 10), and topic.
 4. Click `Generate Page`.
 5. Click `Save as PDF` to export.

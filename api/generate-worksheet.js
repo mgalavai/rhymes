@@ -1,8 +1,7 @@
-const DEFAULT_TEXT_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+const DEFAULT_TEXT_MODEL = process.env.GEMINI_MODEL || 'gemini-3.1-pro-preview'
 const DEFAULT_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image'
 
-const TEXT_MODEL_FALLBACK_ORDER = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3.1-pro-preview']
-const IMAGE_MODEL_FALLBACK_ORDER = ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview']
+const TEXT_MODEL_FALLBACK_ORDER = ['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash']
 
 function normalizeModelName(rawModelName) {
   const trimmed = String(rawModelName || '').trim()
@@ -179,6 +178,26 @@ function humanizeGeminiError(errorMessage, triedModels) {
   }
 
   return `${errorMessage || 'Unknown Gemini API error.'} Tried models: ${triedModels.join(', ')}.`
+}
+
+function summarizeImageError(errorMessage) {
+  const message = String(errorMessage || '')
+  const lowerMessage = message.toLowerCase()
+
+  if (/limit:\s*0/.test(lowerMessage)) {
+    const modelMatch = message.match(/model:\s*([a-z0-9.-]+)/i)
+    const modelName = modelMatch && modelMatch[1] ? modelMatch[1] : 'selected image model'
+    return `Model entitlement is 0 for ${modelName} in this project/key (not normal daily usage).`
+  }
+
+  if (/quota exceeded|rate limit|resource exhausted/.test(lowerMessage)) {
+    const retrySeconds = parseRetrySeconds(message)
+    return retrySeconds
+      ? `Image model throttled. Retry in about ${retrySeconds}s.`
+      : 'Image model throttled this request.'
+  }
+
+  return message.slice(0, 220)
 }
 
 async function callGeminiModel({ apiKey, model, body }) {
@@ -428,14 +447,11 @@ export default async function handler(req, res) {
 
   const requestedTextModel = normalizeModelName(typeof body.model === 'string' ? body.model : '')
   const textModelCandidates = unique([
-    requestedTextModel || normalizeModelName(DEFAULT_TEXT_MODEL) || 'gemini-2.5-flash',
+    requestedTextModel || normalizeModelName(DEFAULT_TEXT_MODEL) || 'gemini-3.1-pro-preview',
     ...TEXT_MODEL_FALLBACK_ORDER,
   ])
 
-  const imageModelCandidates = unique([
-    normalizeModelName(DEFAULT_IMAGE_MODEL) || 'gemini-2.5-flash-image',
-    ...IMAGE_MODEL_FALLBACK_ORDER,
-  ])
+  const imageModelCandidates = unique([normalizeModelName(DEFAULT_IMAGE_MODEL) || 'gemini-2.5-flash-image'])
 
   try {
     const { worksheet, usedModel } = await generateWordWorksheet({
@@ -474,10 +490,12 @@ export default async function handler(req, res) {
       const missingReasons = imageResults
         .filter((item) => item && (!item.image || !item.image.imageDataUrl))
         .slice(0, 3)
-        .map((item) => `${item.word}: ${item.image && item.image.error ? item.image.error : 'no image returned'}`)
+        .map((item) =>
+          `${item.word}: ${summarizeImageError(item.image && item.image.error ? item.image.error : 'no image returned')}`,
+        )
 
       return res.status(502).json({
-        error: `Image generation failed for: ${missingWords.join(', ')}. Verify GEMINI_IMAGE_MODEL access and regenerate. Details: ${missingReasons.join(' || ')}`,
+        error: `Image generation failed for: ${missingWords.join(', ')}. Verify GEMINI_IMAGE_MODEL access (recommended: gemini-2.5-flash-image) and regenerate. Details: ${missingReasons.join(' || ')}`,
       })
     }
 

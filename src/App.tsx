@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import './App.css'
 
-const DEFAULT_MODEL = 'gemini-2.5-flash'
+const DEFAULT_MODEL = 'gemini-3.1-pro-preview'
 
 const LANGUAGE_OPTIONS = [
   'English',
@@ -292,7 +292,7 @@ function App() {
           <input
             value={model}
             onChange={(event) => setModel(event.target.value)}
-            placeholder="gemini-2.5-flash"
+            placeholder="gemini-3.1-pro-preview"
           />
         </label>
 
