@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import './App.css'
 
 const DEFAULT_MODEL = 'gemini-3.1-pro-preview'
@@ -226,7 +226,6 @@ function App() {
   const [isLoading, setIsLoading] = useState(false)
   const [refreshingCardId, setRefreshingCardId] = useState<string | null>(null)
   const [error, setError] = useState('')
-  const [showAnswers, setShowAnswers] = useState(false)
 
   const handleGenerate = async () => {
     setIsLoading(true)
@@ -242,7 +241,6 @@ function App() {
 
       setWorksheet(generated)
       setCards(toColumnCards(generated))
-      setShowAnswers(false)
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : 'Generation failed.'
       setError(message)
@@ -253,17 +251,6 @@ function App() {
 
   const handleRegenerate = async () => {
     await handleGenerate()
-  }
-
-  const handleShuffleRightColumn = () => {
-    if (!cards) {
-      return
-    }
-
-    setCards({
-      left: cards.left,
-      right: shuffle(cards.right),
-    })
   }
 
   const handleRefreshCardImage = async (card: ColumnCard) => {
@@ -335,16 +322,6 @@ function App() {
     }
   }
 
-  const answerPairs = useMemo(
-    () =>
-      worksheet?.pairs.map((pair, pairIndex) => ({
-        pairIndex,
-        leftWord: pair.left.word,
-        rightWord: pair.right.word,
-      })) ?? [],
-    [worksheet],
-  )
-
   return (
     <div className="app-shell">
       <main className="workspace">
@@ -415,19 +392,6 @@ function App() {
             </div>
           )}
         </section>
-
-        {showAnswers && answerPairs.length > 0 ? (
-          <section className="answer-key no-print">
-            <h3>Answer Key</h3>
-            <ul>
-              {answerPairs.map((answer) => (
-                <li key={`${answer.pairIndex}-${answer.leftWord}`}>
-                  {answer.leftWord} ↔ {answer.rightWord}
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
       </main>
 
       <aside className="control-panel no-print">
@@ -479,14 +443,8 @@ function App() {
           <button type="button" onClick={handleRegenerate} disabled={isLoading || !worksheet}>
             Regenerate
           </button>
-          <button type="button" onClick={handleShuffleRightColumn} disabled={!cards || isLoading}>
-            Shuffle Right Column
-          </button>
           <button type="button" onClick={() => window.print()} disabled={!worksheet}>
             Save as PDF
-          </button>
-          <button type="button" onClick={() => setShowAnswers((value) => !value)} disabled={!worksheet}>
-            {showAnswers ? 'Hide Answers' : 'Show Answers'}
           </button>
         </div>
 
