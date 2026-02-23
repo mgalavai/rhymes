@@ -226,6 +226,8 @@ function sanitizeSvg(rawSvg: unknown): string {
   root.removeAttribute('width')
   root.removeAttribute('height')
   root.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+  root.setAttribute('preserveAspectRatio', 'xMidYMid meet')
+  root.setAttribute('overflow', 'hidden')
 
   if (!root.getAttribute('viewBox')) {
     root.setAttribute('viewBox', '0 0 100 100')
@@ -499,30 +501,32 @@ function App() {
             </div>
 
             <div className="worksheet-columns">
-              <ol className="cards-column" aria-label="Column A">
+              <ol className="items-column" aria-label="Column A">
                 {cards.left.map((card, index) => (
-                  <li key={card.id} className="word-card left-card">
-                    <span className="card-index">A{index + 1}</span>
-                    <div className="svg-box" dangerouslySetInnerHTML={{ __html: card.svg }} />
+                  <li key={card.id} className="sheet-item">
+                    <span className="item-index">A{index + 1}</span>
+                    <div className="item-illustration">
+                      <div className="svg-box" dangerouslySetInnerHTML={{ __html: card.svg }} />
+                    </div>
                     <strong>{card.word}</strong>
-                    <span className="connector-dot" aria-hidden="true" />
                   </li>
                 ))}
               </ol>
 
-              <ol className="cards-column" aria-label="Column B">
+              <ol className="items-column" aria-label="Column B">
                 {cards.right.map((card, index) => (
-                  <li key={card.id} className="word-card right-card">
-                    <span className="connector-dot" aria-hidden="true" />
-                    <span className="card-index">B{index + 1}</span>
-                    <div className="svg-box" dangerouslySetInnerHTML={{ __html: card.svg }} />
+                  <li key={card.id} className="sheet-item">
+                    <span className="item-index">B{index + 1}</span>
+                    <div className="item-illustration">
+                      <div className="svg-box" dangerouslySetInnerHTML={{ __html: card.svg }} />
+                    </div>
                     <strong>{card.word}</strong>
                   </li>
                 ))}
               </ol>
             </div>
 
-            <footer className="worksheet-footer">Draw a line from Column A to Column B to match rhymes.</footer>
+            <footer className="worksheet-footer">Draw lines from Column A to Column B to match rhymes.</footer>
           </article>
         ) : (
           <div className="empty-sheet">

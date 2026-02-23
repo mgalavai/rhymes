@@ -43,6 +43,7 @@ function buildPrompt(language, pairCount, topic) {
     '- Style target: clean educational icon (not stick figure, not scribble), balanced geometry, child-friendly look.',
     '- Include 3-8 harmonious flat colors plus subtle darker outlines where useful; avoid gradients and filters.',
     '- Keep the object centered and large (roughly 70-85% of canvas), with no scene elements or decorative background.',
+    '- Keep every visible shape fully inside the viewBox with around 8-10% padding from edges.',
     '- The SVG must contain no text labels and no frame/background shape behind the object.',
     '- Each SVG should use viewBox="0 0 100 100" and contain one object/animal only.',
     '- Prefer simple closed shapes and smooth paths so output remains crisp when printed.',
