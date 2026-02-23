@@ -18,8 +18,7 @@ const LANGUAGE_OPTIONS = [
 
 type WordIllustration = {
   word: string
-  svg: string
-  imageDataUrl?: string
+  imageDataUrl: string
   mimeType?: string
 }
 
@@ -40,8 +39,7 @@ type ColumnCard = {
   id: string
   pairIndex: number
   word: string
-  svg: string
-  imageDataUrl?: string
+  imageDataUrl: string
   side: 'left' | 'right'
 }
 
@@ -51,32 +49,6 @@ type GenerateParams = {
   pairCount: number
   topic: string
 }
-
-const FALLBACK_SVG = `
-<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-  <rect x="12" y="12" width="76" height="76" rx="14" fill="none" stroke="#111" stroke-width="4"/>
-  <circle cx="38" cy="45" r="6" fill="none" stroke="#111" stroke-width="4"/>
-  <circle cx="62" cy="45" r="6" fill="none" stroke="#111" stroke-width="4"/>
-  <path d="M30 66 Q50 80 70 66" fill="none" stroke="#111" stroke-width="4" stroke-linecap="round"/>
-</svg>
-`.trim()
-
-const SVG_TAG_ALLOWLIST = new Set([
-  'svg',
-  'g',
-  'path',
-  'circle',
-  'ellipse',
-  'rect',
-  'line',
-  'polyline',
-  'polygon',
-  'defs',
-  'clipPath',
-  'mask',
-  'title',
-  'desc',
-])
 
 function shuffle<T>(items: T[]): T[] {
   const copy = [...items]
@@ -117,149 +89,11 @@ function sanitizeImageDataUrl(rawValue: unknown): string {
     return value
   }
 
+  if (/^https?:\/\/\S+$/i.test(value)) {
+    return value
+  }
+
   return ''
-}
-
-type SvgViewBox = {
-  x: number
-  y: number
-  width: number
-  height: number
-}
-
-function parseViewBox(value: string | null): SvgViewBox {
-  if (!value) {
-    return { x: 0, y: 0, width: 100, height: 100 }
-  }
-
-  const parts = value
-    .trim()
-    .split(/[\s,]+/)
-    .map((entry) => Number(entry))
-
-  if (parts.length !== 4 || parts.some((entry) => !Number.isFinite(entry))) {
-    return { x: 0, y: 0, width: 100, height: 100 }
-  }
-
-  const [, , width, height] = parts
-  if (width <= 0 || height <= 0) {
-    return { x: 0, y: 0, width: 100, height: 100 }
-  }
-
-  return { x: parts[0], y: parts[1], width, height }
-}
-
-function getNumericAttribute(element: Element, attributeName: string, fallbackValue: number): number {
-  const raw = element.getAttribute(attributeName)
-  if (raw === null || raw.trim() === '') {
-    return fallbackValue
-  }
-
-  const parsed = Number(raw)
-  return Number.isFinite(parsed) ? parsed : fallbackValue
-}
-
-function isLikelyBackgroundRect(element: Element, viewBox: SvgViewBox): boolean {
-  if (element.tagName.toLowerCase() !== 'rect') {
-    return false
-  }
-
-  const stroke = (element.getAttribute('stroke') || '').trim().toLowerCase()
-  if (stroke && stroke !== 'none') {
-    return false
-  }
-
-  const fill = (element.getAttribute('fill') || '').trim().toLowerCase()
-  if (!fill || fill === 'none' || fill === 'transparent') {
-    return false
-  }
-
-  const fillOpacity = getNumericAttribute(element, 'fill-opacity', 1)
-  if (fillOpacity < 0.08) {
-    return false
-  }
-
-  const rectX = getNumericAttribute(element, 'x', viewBox.x)
-  const rectY = getNumericAttribute(element, 'y', viewBox.y)
-  const rectWidth = getNumericAttribute(element, 'width', viewBox.width)
-  const rectHeight = getNumericAttribute(element, 'height', viewBox.height)
-
-  if (rectWidth <= 0 || rectHeight <= 0) {
-    return false
-  }
-
-  const coversMostWidth = rectWidth >= viewBox.width * 0.95
-  const coversMostHeight = rectHeight >= viewBox.height * 0.95
-  const nearLeft = rectX <= viewBox.x + viewBox.width * 0.05
-  const nearTop = rectY <= viewBox.y + viewBox.height * 0.05
-
-  return coversMostWidth && coversMostHeight && nearLeft && nearTop
-}
-
-function sanitizeSvg(rawSvg: unknown): string {
-  if (typeof rawSvg !== 'string' || !rawSvg.includes('<svg')) {
-    return FALLBACK_SVG
-  }
-
-  const parser = new DOMParser()
-  const documentNode = parser.parseFromString(rawSvg, 'image/svg+xml')
-
-  if (documentNode.querySelector('parsererror')) {
-    return FALLBACK_SVG
-  }
-
-  const root = documentNode.documentElement
-  if (root.tagName.toLowerCase() !== 'svg') {
-    return FALLBACK_SVG
-  }
-
-  const nodesToRemove: Element[] = []
-  const treeWalker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT)
-
-  while (treeWalker.nextNode()) {
-    const element = treeWalker.currentNode as Element
-    const tagName = element.tagName.toLowerCase()
-
-    if (!SVG_TAG_ALLOWLIST.has(tagName)) {
-      nodesToRemove.push(element)
-      continue
-    }
-
-    const attributes = Array.from(element.attributes)
-    for (const attribute of attributes) {
-      const name = attribute.name.toLowerCase()
-      const value = attribute.value
-
-      if (name.startsWith('on') || name === 'href' || name === 'xlink:href') {
-        element.removeAttribute(attribute.name)
-        continue
-      }
-
-      if (/url\(/i.test(value) && !value.includes('#')) {
-        element.removeAttribute(attribute.name)
-      }
-    }
-  }
-
-  nodesToRemove.forEach((node) => node.remove())
-
-  root.removeAttribute('width')
-  root.removeAttribute('height')
-  root.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
-  root.setAttribute('preserveAspectRatio', 'xMidYMid meet')
-  root.setAttribute('overflow', 'hidden')
-
-  if (!root.getAttribute('viewBox')) {
-    root.setAttribute('viewBox', '0 0 100 100')
-  }
-
-  const viewBox = parseViewBox(root.getAttribute('viewBox'))
-  const backgroundRects = Array.from(root.querySelectorAll('rect')).filter((element) =>
-    isLikelyBackgroundRect(element, viewBox),
-  )
-  backgroundRects.forEach((element) => element.remove())
-
-  return new XMLSerializer().serializeToString(root)
 }
 
 function normalizeWorksheet(candidate: unknown, language: string, pairCount: number): WorksheetData {
@@ -286,18 +120,23 @@ function normalizeWorksheet(candidate: unknown, language: string, pairCount: num
           : `pair ${index + 1}`,
       left: {
         word: cleanWord(left.word),
-        svg: sanitizeSvg(left.svg),
         imageDataUrl: sanitizeImageDataUrl(left.imageDataUrl),
         mimeType: typeof left.mimeType === 'string' ? left.mimeType : undefined,
       },
       right: {
         word: cleanWord(right.word),
-        svg: sanitizeSvg(right.svg),
         imageDataUrl: sanitizeImageDataUrl(right.imageDataUrl),
         mimeType: typeof right.mimeType === 'string' ? right.mimeType : undefined,
       },
     }
   })
+
+  const missingImages = pairs.filter((pair) => !pair.left.imageDataUrl || !pair.right.imageDataUrl)
+  if (missingImages.length > 0) {
+    throw new Error(
+      'Image generation did not return child-illustration images for all items. Regenerate and ensure image model access.',
+    )
+  }
 
   return {
     title:
@@ -360,7 +199,6 @@ function toColumnCards(worksheet: WorksheetData): { left: ColumnCard[]; right: C
     id: `L-${pairIndex}-${pair.left.word}`,
     pairIndex,
     word: pair.left.word,
-    svg: pair.left.svg,
     imageDataUrl: pair.left.imageDataUrl,
     side: 'left' as const,
   }))
@@ -369,7 +207,6 @@ function toColumnCards(worksheet: WorksheetData): { left: ColumnCard[]; right: C
     id: `R-${pairIndex}-${pair.right.word}`,
     pairIndex,
     word: pair.right.word,
-    svg: pair.right.svg,
     imageDataUrl: pair.right.imageDataUrl,
     side: 'right' as const,
   }))
@@ -534,11 +371,7 @@ function App() {
                     <span className="item-index">A{index + 1}</span>
                     <div className="item-illustration">
                       <div className="svg-box">
-                        {card.imageDataUrl ? (
-                          <img src={card.imageDataUrl} alt="" loading="lazy" decoding="async" />
-                        ) : (
-                          <div dangerouslySetInnerHTML={{ __html: card.svg }} />
-                        )}
+                        <img src={card.imageDataUrl} alt="" loading="lazy" decoding="async" />
                       </div>
                     </div>
                     <strong>{card.word}</strong>
@@ -552,11 +385,7 @@ function App() {
                     <span className="item-index">B{index + 1}</span>
                     <div className="item-illustration">
                       <div className="svg-box">
-                        {card.imageDataUrl ? (
-                          <img src={card.imageDataUrl} alt="" loading="lazy" decoding="async" />
-                        ) : (
-                          <div dangerouslySetInnerHTML={{ __html: card.svg }} />
-                        )}
+                        <img src={card.imageDataUrl} alt="" loading="lazy" decoding="async" />
                       </div>
                     </div>
                     <strong>{card.word}</strong>

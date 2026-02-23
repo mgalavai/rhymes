@@ -49,7 +49,7 @@ function buildPairsPrompt(language, pairCount, topic) {
 
 function buildImagePrompt(word, language, topic) {
   return [
-    `Create one polished vector-style clipart icon for the word "${word}" in ${language}.`,
+    `Create one polished children's clipart icon for the word "${word}" in ${language}.`,
     `Worksheet topic context: ${topic || 'animals and everyday objects'}.`,
     'Output requirements:',
     '- Isolated single object only, transparent background.',
@@ -228,6 +228,18 @@ function extractImageDataFromPayload(payload) {
     }
   }
 
+  for (const part of parts) {
+    const fileData = part && (part.fileData || part.file_data)
+    const uri = fileData && fileData.fileUri
+    const mimeType = fileData && (fileData.mimeType || fileData.mime_type)
+    if (uri && mimeType && String(mimeType).startsWith('image/')) {
+      return {
+        mimeType,
+        dataUrl: String(uri),
+      }
+    }
+  }
+
   return null
 }
 
@@ -313,7 +325,7 @@ async function generateWordImage({ apiKey, word, language, topic, candidateModel
           },
         ],
         generationConfig: {
-          responseModalities: ['Image'],
+          responseModalities: ['TEXT', 'IMAGE'],
           imageConfig: {
             aspectRatio: '1:1',
           },
@@ -440,6 +452,13 @@ export default async function handler(req, res) {
       if (item && item.image && item.image.imageDataUrl) {
         wordToImage.set(item.word, item.image)
       }
+    }
+
+    const missingWords = uniqueWords.filter((word) => !wordToImage.has(word))
+    if (missingWords.length > 0) {
+      return res.status(502).json({
+        error: `Image generation failed for: ${missingWords.join(', ')}. Verify GEMINI_IMAGE_MODEL access and regenerate.`,
+      })
     }
 
     const enrichedPairs = worksheet.pairs.map((pair) => {

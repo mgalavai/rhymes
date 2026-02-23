@@ -49,4 +49,5 @@ For Vercel, add the same variables in Project Settings -> Environment Variables.
 - `.env` files are ignored from git; use `.env.example` as template.
 - Model field accepts both `gemini-...` and `models/gemini-...`.
 - The API generates rhyme words with a text model, then generates isolated icons with an image model.
+- The app is image-only for illustrations (no SVG fallback). If image generation fails, the request fails with an explicit error.
 - If a model is unavailable or entitlement-limited, the API retries with fallback models.
