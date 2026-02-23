@@ -224,6 +224,7 @@ function App() {
   const [worksheet, setWorksheet] = useState<WorksheetData | null>(null)
   const [cards, setCards] = useState<{ left: ColumnCard[]; right: ColumnCard[] } | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [refreshingCardId, setRefreshingCardId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [showAnswers, setShowAnswers] = useState(false)
 
@@ -265,6 +266,75 @@ function App() {
     })
   }
 
+  const handleRefreshCardImage = async (card: ColumnCard) => {
+    if (isLoading || refreshingCardId) {
+      return
+    }
+
+    setRefreshingCardId(card.id)
+    setError('')
+
+    try {
+      const response = await fetch('/api/generate-worksheet', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          word: card.word,
+          language,
+          topic,
+          variationHint: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        }),
+      })
+
+      const payload = (await response.json().catch(() => null)) as
+        | {
+            error?: string
+            imageDataUrl?: unknown
+          }
+        | null
+
+      if (!response.ok) {
+        throw new Error(payload?.error ?? `Could not refresh "${card.word}" image.`)
+      }
+
+      const nextImageDataUrl = sanitizeImageDataUrl(payload?.imageDataUrl)
+      if (!nextImageDataUrl) {
+        throw new Error(`Received invalid image data for "${card.word}".`)
+      }
+
+      setCards((previous) => {
+        if (!previous) {
+          return previous
+        }
+
+        const patchItems = (items: ColumnCard[]) =>
+          items.map((item) =>
+            item.id === card.id
+              ? {
+                  ...item,
+                  imageDataUrl: nextImageDataUrl,
+                }
+              : item,
+          )
+
+        return {
+          left: patchItems(previous.left),
+          right: patchItems(previous.right),
+        }
+      })
+    } catch (caughtError) {
+      const message =
+        caughtError instanceof Error
+          ? caughtError.message
+          : `Could not refresh "${card.word}" image right now.`
+      setError(message)
+    } finally {
+      setRefreshingCardId(null)
+    }
+  }
+
   const answerPairs = useMemo(
     () =>
       worksheet?.pairs.map((pair, pairIndex) => ({
@@ -295,6 +365,16 @@ function App() {
                     <li key={card.id} className="sheet-item">
                       <div className="item-illustration">
                         <div className="svg-box">
+                          <button
+                            type="button"
+                            className={`refresh-image-btn ${refreshingCardId === card.id ? 'is-loading' : ''}`}
+                            onClick={() => void handleRefreshCardImage(card)}
+                            disabled={isLoading || refreshingCardId !== null}
+                            aria-label={`Refresh image for ${card.word}`}
+                            title={`Refresh image for ${card.word}`}
+                          >
+                            ⟳
+                          </button>
                           <img src={card.imageDataUrl} alt="" loading="lazy" decoding="async" />
                         </div>
                       </div>
@@ -308,6 +388,16 @@ function App() {
                     <li key={card.id} className="sheet-item">
                       <div className="item-illustration">
                         <div className="svg-box">
+                          <button
+                            type="button"
+                            className={`refresh-image-btn ${refreshingCardId === card.id ? 'is-loading' : ''}`}
+                            onClick={() => void handleRefreshCardImage(card)}
+                            disabled={isLoading || refreshingCardId !== null}
+                            aria-label={`Refresh image for ${card.word}`}
+                            title={`Refresh image for ${card.word}`}
+                          >
+                            ⟳
+                          </button>
                           <img src={card.imageDataUrl} alt="" loading="lazy" decoding="async" />
                         </div>
                       </div>

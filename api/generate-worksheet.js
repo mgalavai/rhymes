@@ -108,10 +108,13 @@ function buildPairsPrompt(language, pairCount, topic) {
   ].join('\n')
 }
 
-function buildImagePrompt(word, language, topic) {
+function buildImagePrompt(word, language, topic, variationHint = '') {
   return [
     `Create one polished children's clipart icon for the word "${word}" in ${language}.`,
     `Worksheet topic context: ${topic || 'animals and everyday objects'}.`,
+    variationHint
+      ? `Create a noticeably different variation than previous versions. Variation hint: ${variationHint}.`
+      : 'Create a distinct icon composition and silhouette.',
     'Output requirements:',
     '- Isolated single object only, transparent background.',
     '- No scene, no frame, no text, no watermark.',
@@ -440,7 +443,7 @@ async function generateWordWorksheet({ apiKey, language, pairCount, topic, candi
   throw new Error(humanizeGeminiError(lastErrorMessage, candidateModels))
 }
 
-async function generateWordImage({ apiKey, word, language, topic, candidateModels }) {
+async function generateWordImage({ apiKey, word, language, topic, candidateModels, variationHint = '' }) {
   let lastErrorMessage = ''
   let lastNoImageReason = ''
   const attemptErrors = []
@@ -456,7 +459,7 @@ async function generateWordImage({ apiKey, word, language, topic, candidateModel
               role: 'user',
               parts: [
                 {
-                  text: buildImagePrompt(word, language, topic),
+                  text: buildImagePrompt(word, language, topic, variationHint),
                 },
               ],
             },
@@ -511,6 +514,24 @@ async function generateWordImage({ apiKey, word, language, topic, candidateModel
       (attemptErrors.length > 0
         ? attemptErrors.slice(-3).join(' | ')
         : 'Model returned no image data for this word.'),
+  }
+}
+
+async function fallbackSingleWordWithTwemoji({ word }) {
+  const emoji = guessEmojiForWord(word)
+  const emojiFilename = emojiToTwemojiFilename(emoji)
+  const twemojiUrl = `${TWEMOJI_PNG_BASE}/${emojiFilename}.png`
+  const imageDataUrl = await fetchImageAsDataUrl(twemojiUrl)
+
+  if (!imageDataUrl) {
+    return null
+  }
+
+  return {
+    imageDataUrl,
+    mimeType: 'image/png',
+    provider: 'twemoji',
+    emoji,
   }
 }
 
@@ -637,6 +658,8 @@ export default async function handler(req, res) {
   const language = typeof body.language === 'string' && body.language.trim() ? body.language.trim() : 'English'
   const topic = typeof body.topic === 'string' ? body.topic.trim() : ''
   const pairCount = body.pairCount === 4 ? 4 : 5
+  const singleWordRequest = typeof body.word === 'string' ? cleanWord(body.word) : ''
+  const variationHint = typeof body.variationHint === 'string' ? body.variationHint.trim() : ''
 
   const requestedTextModel = normalizeModelName(typeof body.model === 'string' ? body.model : '')
   const textModelCandidates = unique([
@@ -645,6 +668,42 @@ export default async function handler(req, res) {
   ])
 
   const imageModelCandidates = unique([normalizeModelName(DEFAULT_IMAGE_MODEL) || 'gemini-2.5-flash-image'])
+
+  if (singleWordRequest) {
+    const image = await generateWordImage({
+      apiKey,
+      word: singleWordRequest,
+      language,
+      topic,
+      candidateModels: imageModelCandidates,
+      variationHint,
+    })
+
+    if (image && image.imageDataUrl) {
+      return res.status(200).json({
+        word: singleWordRequest,
+        imageDataUrl: image.imageDataUrl,
+        mimeType: image.mimeType || 'image/png',
+        provider: image.usedModel || 'gemini-image',
+      })
+    }
+
+    const twemojiFallback = await fallbackSingleWordWithTwemoji({ word: singleWordRequest })
+    if (twemojiFallback) {
+      return res.status(200).json({
+        word: singleWordRequest,
+        imageDataUrl: twemojiFallback.imageDataUrl,
+        mimeType: twemojiFallback.mimeType,
+        provider: twemojiFallback.provider,
+      })
+    }
+
+    return res.status(502).json({
+      error: `Unable to generate an alternative image for "${singleWordRequest}". ${summarizeImageError(
+        image && image.error ? image.error : 'no image returned',
+      )}`,
+    })
+  }
 
   try {
     const { worksheet, usedModel } = await generateWordWorksheet({
