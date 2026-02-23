@@ -218,7 +218,6 @@ function toColumnCards(worksheet: WorksheetData): { left: ColumnCard[]; right: C
 }
 
 function App() {
-  const [model, setModel] = useState(DEFAULT_MODEL)
   const [language, setLanguage] = useState('English')
   const [pairCount, setPairCount] = useState(5)
   const [topic, setTopic] = useState('animals and everyday objects')
@@ -234,7 +233,7 @@ function App() {
 
     try {
       const generated = await generateWorksheetWithGemini({
-        model,
+        model: DEFAULT_MODEL,
         language,
         pairCount,
         topic,
@@ -353,14 +352,7 @@ function App() {
       </main>
 
       <aside className="control-panel no-print">
-        <label>
-          Model
-          <input
-            value={model}
-            onChange={(event) => setModel(event.target.value)}
-            placeholder="gemini-3.1-pro-preview"
-          />
-        </label>
+        <h2 className="panel-title">Worksheet Controls</h2>
 
         <label>
           Language
@@ -413,8 +405,8 @@ function App() {
 
         {error ? <p className="error-box">{error}</p> : null}
         <p className="help-text">
-          API key is server-side only (<code>GEMINI_API_KEY</code>). Word pairs use the selected
-          text model; icons use <code>GEMINI_IMAGE_MODEL</code> (default:
+          API key is server-side only (<code>GEMINI_API_KEY</code>). Text generation uses
+          <code>{DEFAULT_MODEL}</code>; icons use <code>GEMINI_IMAGE_MODEL</code> (default:
           <code>gemini-2.5-flash-image</code>). If image entitlement is blocked, PNG emoji fallback
           is used.
         </p>
