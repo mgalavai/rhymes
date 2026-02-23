@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import './App.css'
 
-const DEFAULT_MODEL = 'gemini-3.1-pro-preview'
+const DEFAULT_MODEL = 'gemini-2.5-flash'
 
 const LANGUAGE_OPTIONS = [
   'English',
@@ -19,6 +19,8 @@ const LANGUAGE_OPTIONS = [
 type WordIllustration = {
   word: string
   svg: string
+  imageDataUrl?: string
+  mimeType?: string
 }
 
 type RhymePair = {
@@ -39,6 +41,7 @@ type ColumnCard = {
   pairIndex: number
   word: string
   svg: string
+  imageDataUrl?: string
   side: 'left' | 'right'
 }
 
@@ -98,6 +101,23 @@ function cleanWord(rawWord: unknown): string {
     .replace(/\s+/g, ' ')
 
   return cleaned || 'word'
+}
+
+function sanitizeImageDataUrl(rawValue: unknown): string {
+  if (typeof rawValue !== 'string') {
+    return ''
+  }
+
+  const value = rawValue.trim()
+  if (!value) {
+    return ''
+  }
+
+  if (/^data:image\/(png|jpeg|jpg|webp);base64,[a-z0-9+/=\s]+$/i.test(value)) {
+    return value
+  }
+
+  return ''
 }
 
 type SvgViewBox = {
@@ -267,10 +287,14 @@ function normalizeWorksheet(candidate: unknown, language: string, pairCount: num
       left: {
         word: cleanWord(left.word),
         svg: sanitizeSvg(left.svg),
+        imageDataUrl: sanitizeImageDataUrl(left.imageDataUrl),
+        mimeType: typeof left.mimeType === 'string' ? left.mimeType : undefined,
       },
       right: {
         word: cleanWord(right.word),
         svg: sanitizeSvg(right.svg),
+        imageDataUrl: sanitizeImageDataUrl(right.imageDataUrl),
+        mimeType: typeof right.mimeType === 'string' ? right.mimeType : undefined,
       },
     }
   })
@@ -337,6 +361,7 @@ function toColumnCards(worksheet: WorksheetData): { left: ColumnCard[]; right: C
     pairIndex,
     word: pair.left.word,
     svg: pair.left.svg,
+    imageDataUrl: pair.left.imageDataUrl,
     side: 'left' as const,
   }))
 
@@ -345,6 +370,7 @@ function toColumnCards(worksheet: WorksheetData): { left: ColumnCard[]; right: C
     pairIndex,
     word: pair.right.word,
     svg: pair.right.svg,
+    imageDataUrl: pair.right.imageDataUrl,
     side: 'right' as const,
   }))
 
@@ -429,7 +455,7 @@ function App() {
           <input
             value={model}
             onChange={(event) => setModel(event.target.value)}
-            placeholder="gemini-3.1-pro-preview"
+            placeholder="gemini-2.5-flash"
           />
         </label>
 
@@ -484,8 +510,9 @@ function App() {
 
         {error ? <p className="error-box">{error}</p> : null}
         <p className="help-text">
-          API key is server-side only (Vercel env <code>GEMINI_API_KEY</code>) and never sent to
-          the browser.
+          API key is server-side only (<code>GEMINI_API_KEY</code>). Word pairs use the selected
+          text model; icons use <code>GEMINI_IMAGE_MODEL</code> (default:
+          <code>gemini-2.5-flash-image</code>).
         </p>
       </section>
 
@@ -506,7 +533,13 @@ function App() {
                   <li key={card.id} className="sheet-item">
                     <span className="item-index">A{index + 1}</span>
                     <div className="item-illustration">
-                      <div className="svg-box" dangerouslySetInnerHTML={{ __html: card.svg }} />
+                      <div className="svg-box">
+                        {card.imageDataUrl ? (
+                          <img src={card.imageDataUrl} alt="" loading="lazy" decoding="async" />
+                        ) : (
+                          <div dangerouslySetInnerHTML={{ __html: card.svg }} />
+                        )}
+                      </div>
                     </div>
                     <strong>{card.word}</strong>
                   </li>
@@ -518,7 +551,13 @@ function App() {
                   <li key={card.id} className="sheet-item">
                     <span className="item-index">B{index + 1}</span>
                     <div className="item-illustration">
-                      <div className="svg-box" dangerouslySetInnerHTML={{ __html: card.svg }} />
+                      <div className="svg-box">
+                        {card.imageDataUrl ? (
+                          <img src={card.imageDataUrl} alt="" loading="lazy" decoding="async" />
+                        ) : (
+                          <div dangerouslySetInnerHTML={{ __html: card.svg }} />
+                        )}
+                      </div>
                     </div>
                     <strong>{card.word}</strong>
                   </li>

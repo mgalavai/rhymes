@@ -10,7 +10,7 @@ Each generated page has:
 ## Features
 
 - Multiple language support (choose language per worksheet)
-- AI-generated rhyming pairs and SVG illustrations
+- AI-generated rhyming pairs and isolated image icons
 - Regenerate new page quickly
 - Shuffle right column for new matching order
 - Save as PDF via browser print dialog
@@ -30,14 +30,15 @@ If you run `npm run dev`, only the Vite frontend starts (no `/api` serverless ro
 ## Environment Variables
 
 - `GEMINI_API_KEY`: your Gemini API key (server-side only)
-- `GEMINI_MODEL`: optional, defaults to `gemini-3.1-pro-preview`
+- `GEMINI_MODEL`: optional text model for rhyme-word generation (default: `gemini-2.5-flash`)
+- `GEMINI_IMAGE_MODEL`: optional image model for icon generation (default: `gemini-2.5-flash-image`)
 
 For Vercel, add the same variables in Project Settings -> Environment Variables.
 
 ## How To Use
 
-1. Add `GEMINI_API_KEY` and optional `GEMINI_MODEL` in `.env` or Vercel env settings.
-2. Set model (default is `gemini-3.1-pro-preview`).
+1. Add `GEMINI_API_KEY`, optional `GEMINI_MODEL`, and optional `GEMINI_IMAGE_MODEL` in `.env` or Vercel env settings.
+2. Set text model in UI (default is `gemini-2.5-flash`).
 3. Choose language, card count (8 or 10), and topic.
 4. Click `Generate Page`.
 5. Click `Save as PDF` to export.
@@ -47,4 +48,5 @@ For Vercel, add the same variables in Project Settings -> Environment Variables.
 - Gemini requests go through `/api/generate-worksheet`, so the API key is never exposed to the browser.
 - `.env` files are ignored from git; use `.env.example` as template.
 - Model field accepts both `gemini-...` and `models/gemini-...`.
-- If a model is unavailable or entitlement-limited, the API retries with fallback models (`gemini-2.5-pro`, `gemini-2.5-flash`).
+- The API generates rhyme words with a text model, then generates isolated icons with an image model.
+- If a model is unavailable or entitlement-limited, the API retries with fallback models.

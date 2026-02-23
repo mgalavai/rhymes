@@ -1,5 +1,8 @@
-const DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-3.1-pro-preview'
-const MODEL_FALLBACK_ORDER = ['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash']
+const DEFAULT_TEXT_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+const DEFAULT_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image'
+
+const TEXT_MODEL_FALLBACK_ORDER = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-3.1-pro-preview']
+const IMAGE_MODEL_FALLBACK_ORDER = ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview']
 
 function normalizeModelName(rawModelName) {
   const trimmed = String(rawModelName || '').trim()
@@ -12,13 +15,13 @@ function normalizeModelName(rawModelName) {
 }
 
 function unique(items) {
-  return Array.from(new Set(items))
+  return Array.from(new Set(items.filter(Boolean)))
 }
 
-function buildPrompt(language, pairCount, topic) {
+function buildPairsPrompt(language, pairCount, topic) {
   return [
     'You create printable phonics worksheets for children aged 6 to 8.',
-    `Generate exactly ${pairCount} rhyming pairs (${pairCount * 2} total picture cards).`,
+    `Generate exactly ${pairCount} rhyming pairs (${pairCount * 2} total words).`,
     `Target language: ${language}.`,
     `Theme for vocabulary: ${topic || 'animals and everyday objects'}.`,
     '',
@@ -30,8 +33,8 @@ function buildPrompt(language, pairCount, topic) {
     '  "pairs": [',
     '    {',
     '      "rhymeSound": "rhyme ending label",',
-    '      "left": {"word": "noun", "svg": "<svg ...>...</svg>"},',
-    '      "right": {"word": "noun", "svg": "<svg ...>...</svg>"}',
+    '      "leftWord": "noun",',
+    '      "rightWord": "noun"',
     '    }',
     '  ]',
     '}',
@@ -39,15 +42,21 @@ function buildPrompt(language, pairCount, topic) {
     'Requirements:',
     '- Words must be concrete, child-friendly nouns and should rhyme clearly in the target language.',
     '- Keep words short when possible and avoid offensive or abstract vocabulary.',
-    '- Each SVG must be high-quality vector clipart with a transparent background and isolated single object.',
-    '- Style target: clean educational icon (not stick figure, not scribble), balanced geometry, child-friendly look.',
-    '- Include 3-8 harmonious flat colors plus subtle darker outlines where useful; avoid gradients and filters.',
-    '- Keep the object centered and large (roughly 70-85% of canvas), with no scene elements or decorative background.',
-    '- Keep every visible shape fully inside the viewBox with around 8-10% padding from edges.',
-    '- The SVG must contain no text labels and no frame/background shape behind the object.',
-    '- Each SVG should use viewBox="0 0 100 100" and contain one object/animal only.',
-    '- Prefer simple closed shapes and smooth paths so output remains crisp when printed.',
+    '- Avoid duplicates across all words in the worksheet.',
     '- Do not include markdown fences or explanations, output JSON only.',
+  ].join('\n')
+}
+
+function buildImagePrompt(word, language, topic) {
+  return [
+    `Create one polished vector-style clipart icon for the word "${word}" in ${language}.`,
+    `Worksheet topic context: ${topic || 'animals and everyday objects'}.`,
+    'Output requirements:',
+    '- Isolated single object only, transparent background.',
+    '- No scene, no frame, no text, no watermark.',
+    '- Child-friendly educational icon style, clean edges, centered object.',
+    '- Keep full object visible with margin from image edges.',
+    '- 1:1 composition.',
   ].join('\n')
 }
 
@@ -87,7 +96,7 @@ function cleanWord(rawWord) {
   return cleaned || 'word'
 }
 
-function normalizeWorksheet(candidate, language, pairCount) {
+function normalizeWordWorksheet(candidate, language, pairCount) {
   if (!candidate || typeof candidate !== 'object') {
     throw new Error('Model returned an unexpected worksheet format.')
   }
@@ -101,8 +110,6 @@ function normalizeWorksheet(candidate, language, pairCount) {
 
   const pairs = rawPairs.slice(0, pairCount).map((entry, index) => {
     const pair = entry || {}
-    const left = pair.left || {}
-    const right = pair.right || {}
 
     return {
       rhymeSound:
@@ -110,12 +117,10 @@ function normalizeWorksheet(candidate, language, pairCount) {
           ? pair.rhymeSound.trim()
           : `pair ${index + 1}`,
       left: {
-        word: cleanWord(left.word),
-        svg: typeof left.svg === 'string' ? left.svg : '',
+        word: cleanWord(pair.leftWord || (pair.left && pair.left.word)),
       },
       right: {
-        word: cleanWord(right.word),
-        svg: typeof right.svg === 'string' ? right.svg : '',
+        word: cleanWord(pair.rightWord || (pair.right && pair.right.word)),
       },
     }
   })
@@ -163,7 +168,7 @@ function humanizeGeminiError(errorMessage, triedModels) {
   const lowerMessage = String(errorMessage || '').toLowerCase()
 
   if (/limit:\s*0/.test(lowerMessage)) {
-    return `The API project for this key has model entitlement set to 0 ("limit: 0"). This is usually a project/billing-tier configuration issue, not normal daily usage. Try model gemini-2.5-flash or enable paid access on the same Google project as this key. Tried models: ${triedModels.join(', ')}.`
+    return `The API project for this key has model entitlement set to 0 ("limit: 0"). This is usually a project/billing-tier configuration issue, not normal daily usage. Try model gemini-2.5-flash and gemini-2.5-flash-image, or enable paid access on the same Google project as this key. Tried models: ${triedModels.join(', ')}.`
   }
 
   if (/quota exceeded|rate limit|resource exhausted/.test(lowerMessage)) {
@@ -176,7 +181,7 @@ function humanizeGeminiError(errorMessage, triedModels) {
   return `${errorMessage || 'Unknown Gemini API error.'} Tried models: ${triedModels.join(', ')}.`
 }
 
-async function callGeminiModel({ apiKey, model, language, pairCount, topic }) {
+async function callGeminiModel({ apiKey, model, body }) {
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
     {
@@ -184,28 +189,192 @@ async function callGeminiModel({ apiKey, model, language, pairCount, topic }) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                text: buildPrompt(language, pairCount, topic),
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: 0.6,
-        },
-      }),
+      body: JSON.stringify(body),
     },
   )
 
   const payload = await response.json().catch(() => null)
 
   return { response, payload }
+}
+
+function extractTextFromPayload(payload) {
+  return (payload && payload.candidates ? payload.candidates : [])
+    .flatMap((candidate) => (candidate && candidate.content && candidate.content.parts ? candidate.content.parts : []))
+    .map((part) => (part && part.text ? part.text : ''))
+    .join('')
+    .trim()
+}
+
+function extractImageDataFromPayload(payload) {
+  const parts = (payload && payload.candidates ? payload.candidates : []).flatMap((candidate) =>
+    candidate && candidate.content && candidate.content.parts ? candidate.content.parts : [],
+  )
+
+  for (const part of parts) {
+    const inlineData = part && (part.inlineData || part.inline_data)
+    if (!inlineData || !inlineData.data) {
+      continue
+    }
+
+    const mimeType = inlineData.mimeType || inlineData.mime_type || 'image/png'
+    if (!String(mimeType).startsWith('image/')) {
+      continue
+    }
+
+    return {
+      mimeType,
+      dataUrl: `data:${mimeType};base64,${inlineData.data}`,
+    }
+  }
+
+  return null
+}
+
+async function generateWordWorksheet({ apiKey, language, pairCount, topic, candidateModels }) {
+  let lastErrorMessage = ''
+  let lastStatus = 500
+
+  for (const modelName of candidateModels) {
+    const { response, payload } = await callGeminiModel({
+      apiKey,
+      model: modelName,
+      body: {
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: buildPairsPrompt(language, pairCount, topic),
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.4,
+        },
+      },
+    })
+
+    if (!response.ok) {
+      const errorMessage = payload && payload.error && payload.error.message
+        ? payload.error.message
+        : `Gemini API request failed (${response.status}).`
+
+      lastErrorMessage = errorMessage
+      lastStatus = response.status
+
+      if (isRetryableModelError(response.status, errorMessage)) {
+        continue
+      }
+
+      throw new Error(humanizeGeminiError(errorMessage, [modelName]))
+    }
+
+    try {
+      const modelText = extractTextFromPayload(payload)
+      if (!modelText) {
+        throw new Error('Gemini did not return worksheet content.')
+      }
+
+      const worksheetJson = JSON.parse(extractJsonText(modelText))
+      const worksheet = normalizeWordWorksheet(worksheetJson, language, pairCount)
+
+      return {
+        worksheet,
+        usedModel: modelName,
+      }
+    } catch (error) {
+      lastErrorMessage = error instanceof Error ? error.message : 'Invalid JSON returned from model.'
+      lastStatus = 502
+    }
+  }
+
+  throw new Error(humanizeGeminiError(lastErrorMessage, candidateModels))
+}
+
+async function generateWordImage({ apiKey, word, language, topic, candidateModels }) {
+  let lastErrorMessage = ''
+
+  for (const modelName of candidateModels) {
+    const { response, payload } = await callGeminiModel({
+      apiKey,
+      model: modelName,
+      body: {
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: buildImagePrompt(word, language, topic),
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          responseModalities: ['Image'],
+          imageConfig: {
+            aspectRatio: '1:1',
+          },
+          temperature: 0.6,
+        },
+      },
+    })
+
+    if (!response.ok) {
+      const errorMessage = payload && payload.error && payload.error.message
+        ? payload.error.message
+        : `Gemini image request failed (${response.status}).`
+
+      lastErrorMessage = errorMessage
+
+      if (isRetryableModelError(response.status, errorMessage)) {
+        continue
+      }
+
+      return null
+    }
+
+    const image = extractImageDataFromPayload(payload)
+    if (image && image.dataUrl) {
+      return {
+        imageDataUrl: image.dataUrl,
+        mimeType: image.mimeType,
+        usedModel: modelName,
+      }
+    }
+  }
+
+  if (lastErrorMessage) {
+    return null
+  }
+
+  return null
+}
+
+async function mapWithConcurrency(items, concurrency, mapper) {
+  const results = new Array(items.length)
+  let nextIndex = 0
+
+  const workerCount = Math.max(1, Math.min(concurrency, items.length))
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (true) {
+        const index = nextIndex
+        nextIndex += 1
+
+        if (index >= items.length) {
+          return
+        }
+
+        results[index] = await mapper(items[index], index)
+      }
+    }),
+  )
+
+  return results
 }
 
 export default async function handler(req, res) {
@@ -230,69 +399,78 @@ export default async function handler(req, res) {
   const topic = typeof body.topic === 'string' ? body.topic.trim() : ''
   const pairCount = body.pairCount === 4 ? 4 : 5
 
-  const requestedModel = normalizeModelName(typeof body.model === 'string' ? body.model : '')
-  const defaultModel = normalizeModelName(DEFAULT_MODEL) || 'gemini-2.5-flash'
-  const candidateModels = unique([
-    requestedModel || defaultModel,
-    ...MODEL_FALLBACK_ORDER.filter((modelName) => modelName !== requestedModel),
+  const requestedTextModel = normalizeModelName(typeof body.model === 'string' ? body.model : '')
+  const textModelCandidates = unique([
+    requestedTextModel || normalizeModelName(DEFAULT_TEXT_MODEL) || 'gemini-2.5-flash',
+    ...TEXT_MODEL_FALLBACK_ORDER,
   ])
 
-  let lastErrorMessage = ''
-  let lastStatus = 500
+  const imageModelCandidates = unique([
+    normalizeModelName(DEFAULT_IMAGE_MODEL) || 'gemini-2.5-flash-image',
+    ...IMAGE_MODEL_FALLBACK_ORDER,
+  ])
 
-  for (const modelName of candidateModels) {
-    const { response, payload } = await callGeminiModel({
+  try {
+    const { worksheet, usedModel } = await generateWordWorksheet({
       apiKey,
-      model: modelName,
       language,
       pairCount,
       topic,
+      candidateModels: textModelCandidates,
     })
 
-    if (!response.ok) {
-      const errorMessage = payload && payload.error && payload.error.message
-        ? payload.error.message
-        : `Gemini API request failed (${response.status}).`
+    const uniqueWords = unique(
+      worksheet.pairs.flatMap((pair) => [pair.left.word, pair.right.word]).map((word) => cleanWord(word)),
+    )
 
-      lastErrorMessage = errorMessage
-      lastStatus = response.status
+    const wordToImage = new Map()
+    const imageResults = await mapWithConcurrency(uniqueWords, 2, async (word) => {
+      const image = await generateWordImage({
+        apiKey,
+        word,
+        language,
+        topic,
+        candidateModels: imageModelCandidates,
+      })
 
-      if (isRetryableModelError(response.status, errorMessage)) {
-        continue
+      return { word, image }
+    })
+
+    for (const item of imageResults) {
+      if (item && item.image && item.image.imageDataUrl) {
+        wordToImage.set(item.word, item.image)
       }
-
-      return res.status(response.status).json({
-        error: humanizeGeminiError(errorMessage, [modelName]),
-      })
     }
 
-    const modelText = (payload && payload.candidates ? payload.candidates : [])
-      .flatMap((candidate) => (candidate && candidate.content && candidate.content.parts ? candidate.content.parts : []))
-      .map((part) => (part && part.text ? part.text : ''))
-      .join('')
-      .trim()
+    const enrichedPairs = worksheet.pairs.map((pair) => {
+      const leftImage = wordToImage.get(pair.left.word)
+      const rightImage = wordToImage.get(pair.right.word)
 
-    if (!modelText) {
-      lastErrorMessage = 'Gemini did not return worksheet content.'
-      lastStatus = 502
-      continue
-    }
+      return {
+        ...pair,
+        left: {
+          ...pair.left,
+          imageDataUrl: leftImage ? leftImage.imageDataUrl : '',
+          mimeType: leftImage ? leftImage.mimeType : '',
+        },
+        right: {
+          ...pair.right,
+          imageDataUrl: rightImage ? rightImage.imageDataUrl : '',
+          mimeType: rightImage ? rightImage.mimeType : '',
+        },
+      }
+    })
 
-    try {
-      const worksheetJson = JSON.parse(extractJsonText(modelText))
-      const worksheet = normalizeWorksheet(worksheetJson, language, pairCount)
-
-      return res.status(200).json({
-        worksheet,
-        usedModel: modelName,
-      })
-    } catch (error) {
-      lastErrorMessage = error instanceof Error ? error.message : 'Invalid JSON returned from model.'
-      lastStatus = 502
-    }
+    return res.status(200).json({
+      worksheet: {
+        ...worksheet,
+        pairs: enrichedPairs,
+      },
+      usedTextModel: usedModel,
+      usedImageModels: imageModelCandidates,
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Worksheet generation failed.'
+    return res.status(502).json({ error: message })
   }
-
-  return res.status(lastStatus).json({
-    error: humanizeGeminiError(lastErrorMessage, candidateModels),
-  })
 }
