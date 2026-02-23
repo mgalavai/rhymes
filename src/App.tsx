@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import './App.css'
 
 const DEFAULT_API_KEY = import.meta.env.VITE_GEMINI_API_KEY ?? ''
-const DEFAULT_MODEL = import.meta.env.VITE_GEMINI_MODEL ?? 'gemini-3.1-pro'
+const DEFAULT_MODEL = import.meta.env.VITE_GEMINI_MODEL ?? 'gemini-3.1-pro-preview'
+const MODEL_FALLBACK_ORDER = ['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash']
 
 const LANGUAGE_OPTIONS = [
   'English',
@@ -49,6 +50,20 @@ type GenerateParams = {
   language: string
   pairCount: number
   topic: string
+}
+
+function normalizeModelName(rawModelName: string): string {
+  const trimmed = rawModelName.trim()
+
+  if (!trimmed) {
+    return ''
+  }
+
+  return trimmed.startsWith('models/') ? trimmed.slice('models/'.length) : trimmed
+}
+
+function withUniqueValues(items: string[]): string[] {
+  return Array.from(new Set(items))
 }
 
 const FALLBACK_SVG = `
@@ -271,63 +286,85 @@ async function generateWorksheetWithGemini({
     throw new Error('API key is required.')
   }
 
-  if (!model.trim()) {
+  const normalizedModel = normalizeModelName(model)
+  if (!normalizedModel) {
     throw new Error('Model name is required.')
   }
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model.trim())}:generateContent?key=${encodeURIComponent(apiKey.trim())}`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                text: buildPrompt(language, pairCount, topic),
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: 0.75,
+  const candidateModels = withUniqueValues([
+    normalizedModel,
+    ...MODEL_FALLBACK_ORDER.filter((modelName) => modelName !== normalizedModel),
+  ])
+
+  let lastErrorMessage = ''
+
+  for (const modelName of candidateModels) {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent?key=${encodeURIComponent(apiKey.trim())}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      }),
-    },
-  )
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  text: buildPrompt(language, pairCount, topic),
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.75,
+          },
+        }),
+      },
+    )
 
-  const payload = (await response.json().catch(() => null)) as
-    | {
-        error?: { message?: string }
-        candidates?: Array<{
-          content?: {
-            parts?: Array<{ text?: string }>
-          }
-        }>
+    const payload = (await response.json().catch(() => null)) as
+      | {
+          error?: { message?: string }
+          candidates?: Array<{
+            content?: {
+              parts?: Array<{ text?: string }>
+            }
+          }>
+        }
+      | null
+
+    if (!response.ok) {
+      const errorMessage = payload?.error?.message ?? `Gemini API request failed (${response.status}).`
+      lastErrorMessage = errorMessage
+
+      const canRetryModel = /not found|not supported|unsupported/i.test(errorMessage)
+      if (!canRetryModel) {
+        throw new Error(errorMessage)
       }
-    | null
 
-  if (!response.ok) {
-    throw new Error(payload?.error?.message ?? `Gemini API request failed (${response.status}).`)
+      continue
+    }
+
+    const modelText = payload?.candidates
+      ?.flatMap((candidate) => candidate.content?.parts ?? [])
+      .map((part) => part.text ?? '')
+      .join('')
+      .trim()
+
+    if (!modelText) {
+      throw new Error('Gemini did not return worksheet content.')
+    }
+
+    const worksheetJson = JSON.parse(extractJsonText(modelText)) as unknown
+    return normalizeWorksheet(worksheetJson, language, pairCount)
   }
 
-  const modelText = payload?.candidates
-    ?.flatMap((candidate) => candidate.content?.parts ?? [])
-    .map((part) => part.text ?? '')
-    .join('')
-    .trim()
-
-  if (!modelText) {
-    throw new Error('Gemini did not return worksheet content.')
-  }
-
-  const worksheetJson = JSON.parse(extractJsonText(modelText)) as unknown
-  return normalizeWorksheet(worksheetJson, language, pairCount)
+  throw new Error(
+    `Unable to generate with the provided model. Tried: ${candidateModels.join(', ')}. Last API error: ${lastErrorMessage || 'unknown error'}.`,
+  )
 }
 
 function toColumnCards(worksheet: WorksheetData): { left: ColumnCard[]; right: ColumnCard[] } {
@@ -439,7 +476,7 @@ function App() {
           <input
             value={model}
             onChange={(event) => setModel(event.target.value)}
-            placeholder="gemini-3.1-pro"
+            placeholder="gemini-3.1-pro-preview"
           />
         </label>
 
@@ -494,8 +531,8 @@ function App() {
 
         {error ? <p className="error-box">{error}</p> : null}
         <p className="help-text">
-          This demo keeps the API key in the browser only. If the model name is unavailable in your
-          account, switch it to another Gemini model string.
+          This demo keeps the API key in the browser only. You can enter either
+          <code>gemini-3.1-pro-preview</code> or <code>models/gemini-3.1-pro-preview</code>.
         </p>
       </section>
 

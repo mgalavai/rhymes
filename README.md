@@ -28,7 +28,7 @@ Open the app URL printed by Vite.
 ## Environment Variables
 
 - `VITE_GEMINI_API_KEY`: your Gemini API key
-- `VITE_GEMINI_MODEL`: optional, defaults to `gemini-3.1-pro`
+- `VITE_GEMINI_MODEL`: optional, defaults to `gemini-3.1-pro-preview`
 
 For Vercel, add the same variables in Project Settings -> Environment Variables.
 
@@ -36,7 +36,7 @@ For Vercel, add the same variables in Project Settings -> Environment Variables.
 
 1. Add key/model in `.env` (or Vercel env settings).
 2. Optionally replace API key in the UI for temporary testing.
-3. Set model (default is `gemini-3.1-pro`).
+3. Set model (default is `gemini-3.1-pro-preview`).
 4. Choose language, card count (8 or 10), and topic.
 5. Click `Generate Page`.
 6. Click `Save as PDF` to export.
@@ -45,4 +45,5 @@ For Vercel, add the same variables in Project Settings -> Environment Variables.
 
 - This demo calls Gemini directly from the browser.
 - `.env` files are ignored from git; use `.env.example` as template.
-- If the configured model name is not available in your account, update the model field.
+- Model field accepts both `gemini-...` and `models/gemini-...`.
+- If a model is unavailable, the app retries with fallback models (`gemini-2.5-pro`, `gemini-2.5-flash`).
