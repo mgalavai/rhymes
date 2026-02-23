@@ -308,61 +308,76 @@ async function generateWordWorksheet({ apiKey, language, pairCount, topic, candi
 
 async function generateWordImage({ apiKey, word, language, topic, candidateModels }) {
   let lastErrorMessage = ''
+  let lastNoImageReason = ''
+  const attemptErrors = []
 
   for (const modelName of candidateModels) {
-    const { response, payload } = await callGeminiModel({
-      apiKey,
-      model: modelName,
-      body: {
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                text: buildImagePrompt(word, language, topic),
-              },
-            ],
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const { response, payload } = await callGeminiModel({
+        apiKey,
+        model: modelName,
+        body: {
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  text: buildImagePrompt(word, language, topic),
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            responseModalities: ['IMAGE'],
+            temperature: 0.4,
           },
-        ],
-        generationConfig: {
-          responseModalities: ['TEXT', 'IMAGE'],
-          imageConfig: {
-            aspectRatio: '1:1',
-          },
-          temperature: 0.6,
         },
-      },
-    })
+      })
 
-    if (!response.ok) {
-      const errorMessage = payload && payload.error && payload.error.message
-        ? payload.error.message
-        : `Gemini image request failed (${response.status}).`
+      if (!response.ok) {
+        const errorMessage = payload && payload.error && payload.error.message
+          ? payload.error.message
+          : `Gemini image request failed (${response.status}).`
 
-      lastErrorMessage = errorMessage
+        lastErrorMessage = errorMessage
+        attemptErrors.push(`${modelName} (attempt ${attempt + 1}): ${errorMessage}`)
 
-      if (isRetryableModelError(response.status, errorMessage)) {
-        continue
+        if (isRetryableModelError(response.status, errorMessage)) {
+          continue
+        }
+
+        return { error: errorMessage }
       }
 
-      return null
-    }
+      const image = extractImageDataFromPayload(payload)
+      if (image && image.dataUrl) {
+        return {
+          imageDataUrl: image.dataUrl,
+          mimeType: image.mimeType,
+          usedModel: modelName,
+        }
+      }
 
-    const image = extractImageDataFromPayload(payload)
-    if (image && image.dataUrl) {
-      return {
-        imageDataUrl: image.dataUrl,
-        mimeType: image.mimeType,
-        usedModel: modelName,
+      const textReason = extractTextFromPayload(payload)
+      if (textReason) {
+        lastNoImageReason = textReason
+        attemptErrors.push(
+          `${modelName} (attempt ${attempt + 1}): model returned text instead of image: ${textReason.slice(0, 220)}`,
+        )
+      } else {
+        attemptErrors.push(`${modelName} (attempt ${attempt + 1}): model returned no image data`)
       }
     }
   }
 
-  if (lastErrorMessage) {
-    return null
+  return {
+    error:
+      lastErrorMessage ||
+      lastNoImageReason ||
+      (attemptErrors.length > 0
+        ? attemptErrors.slice(-3).join(' | ')
+        : 'Model returned no image data for this word.'),
   }
-
-  return null
 }
 
 async function mapWithConcurrency(items, concurrency, mapper) {
@@ -456,8 +471,13 @@ export default async function handler(req, res) {
 
     const missingWords = uniqueWords.filter((word) => !wordToImage.has(word))
     if (missingWords.length > 0) {
+      const missingReasons = imageResults
+        .filter((item) => item && (!item.image || !item.image.imageDataUrl))
+        .slice(0, 3)
+        .map((item) => `${item.word}: ${item.image && item.image.error ? item.image.error : 'no image returned'}`)
+
       return res.status(502).json({
-        error: `Image generation failed for: ${missingWords.join(', ')}. Verify GEMINI_IMAGE_MODEL access and regenerate.`,
+        error: `Image generation failed for: ${missingWords.join(', ')}. Verify GEMINI_IMAGE_MODEL access and regenerate. Details: ${missingReasons.join(' || ')}`,
       })
     }
 
