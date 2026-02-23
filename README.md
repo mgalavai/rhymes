@@ -20,30 +20,31 @@ Each generated page has:
 ```bash
 cp .env.example .env
 npm install
-npm run dev
+npx vercel dev
 ```
 
-Open the app URL printed by Vite.
+Open the local URL printed by Vercel.
+
+If you run `npm run dev`, only the Vite frontend starts (no `/api` serverless route).
 
 ## Environment Variables
 
-- `VITE_GEMINI_API_KEY`: your Gemini API key
-- `VITE_GEMINI_MODEL`: optional, defaults to `gemini-3.1-pro-preview`
+- `GEMINI_API_KEY`: your Gemini API key (server-side only)
+- `GEMINI_MODEL`: optional, defaults to `gemini-3.1-pro-preview`
 
 For Vercel, add the same variables in Project Settings -> Environment Variables.
 
 ## How To Use
 
-1. Add key/model in `.env` (or Vercel env settings).
-2. Optionally replace API key in the UI for temporary testing.
-3. Set model (default is `gemini-3.1-pro-preview`).
-4. Choose language, card count (8 or 10), and topic.
-5. Click `Generate Page`.
-6. Click `Save as PDF` to export.
+1. Add `GEMINI_API_KEY` and optional `GEMINI_MODEL` in `.env` or Vercel env settings.
+2. Set model (default is `gemini-3.1-pro-preview`).
+3. Choose language, card count (8 or 10), and topic.
+4. Click `Generate Page`.
+5. Click `Save as PDF` to export.
 
 ## Notes
 
-- This demo calls Gemini directly from the browser.
+- Gemini requests go through `/api/generate-worksheet`, so the API key is never exposed to the browser.
 - `.env` files are ignored from git; use `.env.example` as template.
 - Model field accepts both `gemini-...` and `models/gemini-...`.
-- If a model is unavailable, the app retries with fallback models (`gemini-2.5-pro`, `gemini-2.5-flash`).
+- If a model is unavailable or entitlement-limited, the API retries with fallback models (`gemini-2.5-pro`, `gemini-2.5-flash`).

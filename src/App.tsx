@@ -1,9 +1,7 @@
 import { useMemo, useState } from 'react'
 import './App.css'
 
-const DEFAULT_API_KEY = import.meta.env.VITE_GEMINI_API_KEY ?? ''
-const DEFAULT_MODEL = import.meta.env.VITE_GEMINI_MODEL ?? 'gemini-3.1-pro-preview'
-const MODEL_FALLBACK_ORDER = ['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash']
+const DEFAULT_MODEL = 'gemini-3.1-pro-preview'
 
 const LANGUAGE_OPTIONS = [
   'English',
@@ -45,25 +43,10 @@ type ColumnCard = {
 }
 
 type GenerateParams = {
-  apiKey: string
   model: string
   language: string
   pairCount: number
   topic: string
-}
-
-function normalizeModelName(rawModelName: string): string {
-  const trimmed = rawModelName.trim()
-
-  if (!trimmed) {
-    return ''
-  }
-
-  return trimmed.startsWith('models/') ? trimmed.slice('models/'.length) : trimmed
-}
-
-function withUniqueValues(items: string[]): string[] {
-  return Array.from(new Set(items))
 }
 
 const FALLBACK_SVG = `
@@ -175,28 +158,6 @@ function sanitizeSvg(rawSvg: unknown): string {
   return new XMLSerializer().serializeToString(root)
 }
 
-function extractJsonText(rawText: string): string {
-  const trimmed = rawText.trim()
-
-  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-    return trimmed
-  }
-
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]+?)\s*```/i)
-  if (fenced?.[1]) {
-    return fenced[1].trim()
-  }
-
-  const firstBrace = trimmed.indexOf('{')
-  const lastBrace = trimmed.lastIndexOf('}')
-
-  if (firstBrace >= 0 && lastBrace > firstBrace) {
-    return trimmed.slice(firstBrace, lastBrace + 1)
-  }
-
-  throw new Error('Could not parse JSON from the model response.')
-}
-
 function normalizeWorksheet(candidate: unknown, language: string, pairCount: number): WorksheetData {
   if (!candidate || typeof candidate !== 'object') {
     throw new Error('Model returned an unexpected worksheet format.')
@@ -245,126 +206,45 @@ function normalizeWorksheet(candidate: unknown, language: string, pairCount: num
   }
 }
 
-function buildPrompt(language: string, pairCount: number, topic: string): string {
-  return [
-    'You create printable phonics worksheets for children aged 6 to 8.',
-    `Generate exactly ${pairCount} rhyming pairs (${pairCount * 2} total picture cards).`,
-    `Target language: ${language}.`,
-    `Theme for vocabulary: ${topic || 'animals and everyday objects'}.`,
-    '',
-    'Return JSON only with this exact shape:',
-    '{',
-    '  "title": "short worksheet title",',
-    '  "instruction": "single sentence instruction for the child",',
-    '  "language": "language name",',
-    '  "pairs": [',
-    '    {',
-    '      "rhymeSound": "rhyme ending label",',
-    '      "left": {"word": "noun", "svg": "<svg ...>...</svg>"},',
-    '      "right": {"word": "noun", "svg": "<svg ...>...</svg>"}',
-    '    }',
-    '  ]',
-    '}',
-    '',
-    'Requirements:',
-    '- Words must be concrete, child-friendly nouns and should rhyme clearly in the target language.',
-    '- Keep words short when possible and avoid offensive or abstract vocabulary.',
-    '- Each SVG must be a simple black-and-white line drawing, no text labels, no background, printable.',
-    '- Each SVG should use viewBox="0 0 100 100" and contain one object/animal only.',
-    '- Do not include markdown fences or explanations, output JSON only.',
-  ].join('\n')
-}
-
 async function generateWorksheetWithGemini({
-  apiKey,
   model,
   language,
   pairCount,
   topic,
 }: GenerateParams): Promise<WorksheetData> {
-  if (!apiKey.trim()) {
-    throw new Error('API key is required.')
-  }
-
-  const normalizedModel = normalizeModelName(model)
-  if (!normalizedModel) {
+  if (!model.trim()) {
     throw new Error('Model name is required.')
   }
 
-  const candidateModels = withUniqueValues([
-    normalizedModel,
-    ...MODEL_FALLBACK_ORDER.filter((modelName) => modelName !== normalizedModel),
-  ])
+  const response = await fetch('/api/generate-worksheet', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      language,
+      pairCount,
+      topic,
+    }),
+  })
 
-  let lastErrorMessage = ''
-
-  for (const modelName of candidateModels) {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent?key=${encodeURIComponent(apiKey.trim())}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                {
-                  text: buildPrompt(language, pairCount, topic),
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            temperature: 0.75,
-          },
-        }),
-      },
-    )
-
-    const payload = (await response.json().catch(() => null)) as
-      | {
-          error?: { message?: string }
-          candidates?: Array<{
-            content?: {
-              parts?: Array<{ text?: string }>
-            }
-          }>
-        }
-      | null
-
-    if (!response.ok) {
-      const errorMessage = payload?.error?.message ?? `Gemini API request failed (${response.status}).`
-      lastErrorMessage = errorMessage
-
-      const canRetryModel = /not found|not supported|unsupported/i.test(errorMessage)
-      if (!canRetryModel) {
-        throw new Error(errorMessage)
+  const payload = (await response.json().catch(() => null)) as
+    | {
+        error?: string
+        worksheet?: unknown
       }
+    | null
 
-      continue
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error('API route is missing. Run with `vercel dev` locally or deploy to Vercel.')
     }
 
-    const modelText = payload?.candidates
-      ?.flatMap((candidate) => candidate.content?.parts ?? [])
-      .map((part) => part.text ?? '')
-      .join('')
-      .trim()
-
-    if (!modelText) {
-      throw new Error('Gemini did not return worksheet content.')
-    }
-
-    const worksheetJson = JSON.parse(extractJsonText(modelText)) as unknown
-    return normalizeWorksheet(worksheetJson, language, pairCount)
+    throw new Error(payload?.error ?? `Worksheet generation failed (${response.status}).`)
   }
 
-  throw new Error(
-    `Unable to generate with the provided model. Tried: ${candidateModels.join(', ')}. Last API error: ${lastErrorMessage || 'unknown error'}.`,
-  )
+  return normalizeWorksheet(payload?.worksheet, language, pairCount)
 }
 
 function toColumnCards(worksheet: WorksheetData): { left: ColumnCard[]; right: ColumnCard[] } {
@@ -391,7 +271,6 @@ function toColumnCards(worksheet: WorksheetData): { left: ColumnCard[]; right: C
 }
 
 function App() {
-  const [apiKey, setApiKey] = useState(DEFAULT_API_KEY)
   const [model, setModel] = useState(DEFAULT_MODEL)
   const [language, setLanguage] = useState('English')
   const [pairCount, setPairCount] = useState(5)
@@ -408,7 +287,6 @@ function App() {
 
     try {
       const generated = await generateWorksheetWithGemini({
-        apiKey,
         model,
         language,
         pairCount,
@@ -462,15 +340,6 @@ function App() {
       </header>
 
       <section className="control-panel no-print">
-        <label>
-          API Key
-          <input
-            value={apiKey}
-            onChange={(event) => setApiKey(event.target.value)}
-            placeholder="Gemini API key"
-          />
-        </label>
-
         <label>
           Model
           <input
@@ -531,8 +400,8 @@ function App() {
 
         {error ? <p className="error-box">{error}</p> : null}
         <p className="help-text">
-          This demo keeps the API key in the browser only. You can enter either
-          <code>gemini-3.1-pro-preview</code> or <code>models/gemini-3.1-pro-preview</code>.
+          API key is server-side only (Vercel env <code>GEMINI_API_KEY</code>) and never sent to
+          the browser.
         </p>
       </section>
 
