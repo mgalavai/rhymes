@@ -1,5 +1,7 @@
 const DEFAULT_TEXT_MODEL = process.env.GEMINI_MODEL || 'gemini-3.1-pro-preview'
 const DEFAULT_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image'
+const DEFAULT_IMAGE_ATTEMPTS = Number(process.env.GEMINI_IMAGE_ATTEMPTS || '1')
+const DEFAULT_IMAGE_CONCURRENCY = Number(process.env.GEMINI_IMAGE_CONCURRENCY || '4')
 
 const TEXT_MODEL_FALLBACK_ORDER = ['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash']
 
@@ -25,6 +27,16 @@ function normalizeImageModelName(rawModelName) {
 
 function unique(items) {
   return Array.from(new Set(items.filter(Boolean)))
+}
+
+function toBoundedInteger(value, fallback, min, max) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) {
+    return fallback
+  }
+
+  const rounded = Math.floor(parsed)
+  return Math.max(min, Math.min(max, rounded))
 }
 
 function buildPairsPrompt(language, pairCount, topic) {
@@ -58,7 +70,7 @@ function buildPairsPrompt(language, pairCount, topic) {
 
 function buildImagePrompt(word, language, topic, variationHint = '') {
   return [
-    `Create one polished children's clipart icon for the word "${word}" in ${language}.`,
+    `Create one polished children's educational clipart icon for the word "${word}" in ${language}.`,
     `Worksheet topic context: ${topic || 'animals and everyday objects'}.`,
     variationHint
       ? `Create a noticeably different variation than previous versions. Variation hint: ${variationHint}.`
@@ -68,7 +80,8 @@ function buildImagePrompt(word, language, topic, variationHint = '') {
     '- Plain white background only (no transparency).',
     '- No checkerboard/alpha-grid background and no black background.',
     '- No scene, no frame, no border, no collage, no text, no watermark.',
-    '- Child-friendly flat clipart style with clean outlines and consistent colors.',
+    '- Child-friendly flat vector-like clipart style with clean outlines and consistent colors.',
+    '- Make the object large: occupy about 80% to 90% of canvas area.',
     '- Keep full object visible with clear margin from image edges.',
     '- 1:1 composition.',
   ].join('\n')
@@ -436,13 +449,21 @@ async function generateAlternativeWord({
   return cleanWord(currentWord)
 }
 
-async function generateWordImage({ apiKey, word, language, topic, candidateModels, variationHint = '' }) {
+async function generateWordImage({
+  apiKey,
+  word,
+  language,
+  topic,
+  candidateModels,
+  variationHint = '',
+  maxAttemptsPerModel = 1,
+}) {
   let lastErrorMessage = ''
   let lastNoImageReason = ''
   const attemptErrors = []
 
   for (const modelName of candidateModels) {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    for (let attempt = 0; attempt < maxAttemptsPerModel; attempt += 1) {
       const { response, payload } = await callGeminiModel({
         apiKey,
         model: modelName,
@@ -459,7 +480,7 @@ async function generateWordImage({ apiKey, word, language, topic, candidateModel
           ],
           generationConfig: {
             responseModalities: ['IMAGE'],
-            temperature: 0.4,
+            temperature: 0.2,
           },
         },
       })
@@ -570,6 +591,8 @@ export default async function handler(req, res) {
   ])
 
   const requestedImageModel = normalizeImageModelName(DEFAULT_IMAGE_MODEL)
+  const imageAttempts = toBoundedInteger(DEFAULT_IMAGE_ATTEMPTS, 1, 1, 3)
+  const imageConcurrency = toBoundedInteger(DEFAULT_IMAGE_CONCURRENCY, 4, 1, 8)
   const rawImageModelEnv = process.env.GEMINI_IMAGE_MODEL || '(unset)'
   const imageModelCandidates = unique([
     requestedImageModel || 'gemini-2.5-flash-image',
@@ -597,6 +620,7 @@ export default async function handler(req, res) {
       topic,
       candidateModels: imageModelCandidates,
       variationHint,
+      maxAttemptsPerModel: Math.max(2, imageAttempts),
     })
 
     if (image && image.imageDataUrl) {
@@ -616,6 +640,8 @@ export default async function handler(req, res) {
         rawImageModelEnv,
         normalizedImageModel: requestedImageModel,
         imageModelCandidates,
+        imageAttempts,
+        imageConcurrency,
         sampleAttempts:
           image && Array.isArray(image.debugAttempts) ? image.debugAttempts.slice(-3) : [],
       },
@@ -636,13 +662,14 @@ export default async function handler(req, res) {
     )
 
     const wordToImage = new Map()
-    const imageResults = await mapWithConcurrency(uniqueWords, 2, async (word) => {
+    const imageResults = await mapWithConcurrency(uniqueWords, imageConcurrency, async (word) => {
       const image = await generateWordImage({
         apiKey,
         word,
         language,
         topic,
         candidateModels: imageModelCandidates,
+        maxAttemptsPerModel: imageAttempts,
       })
 
       return { word, image }
@@ -696,6 +723,8 @@ export default async function handler(req, res) {
               rawImageModelEnv,
               normalizedImageModel: requestedImageModel,
               imageModelCandidates,
+              imageAttempts,
+              imageConcurrency,
               missingWords,
               sampleFailures: failureDiagnostics,
             }

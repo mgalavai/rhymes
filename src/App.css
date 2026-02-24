@@ -232,7 +232,7 @@
 .worksheet-page,
 .empty-sheet {
   --pair-count: 5;
-  --icon-size: clamp(5.1rem, calc(11.5rem - (var(--pair-count) * 1rem)), 9.4rem);
+  --icon-size: clamp(7.2rem, calc(14rem - (var(--pair-count) * 0.9rem)), 10.8rem);
   height: 100%;
   width: auto;
   max-width: 100%;
@@ -402,9 +402,10 @@
 }
 
 .svg-box img {
-  width: 100%;
-  height: 100%;
-  max-height: 100%;
+  width: 114%;
+  height: 114%;
+  max-width: none;
+  max-height: none;
   object-fit: contain;
   display: block;
 }
@@ -539,7 +540,7 @@
   }
 
   .worksheet-page {
-    --icon-size: clamp(24mm, calc(44mm - (var(--pair-count) * 3mm)), 35mm);
+    --icon-size: clamp(31mm, calc(54mm - (var(--pair-count) * 3mm)), 42mm);
     width: 100%;
     height: calc(297mm - 16mm);
     max-height: calc(297mm - 16mm);
@@ -597,8 +598,10 @@
   }
 
   .svg-box img {
-    width: 100%;
-    height: 100%;
+    width: 114%;
+    height: 114%;
+    max-width: none;
+    max-height: none;
     object-fit: contain;
   }
 
