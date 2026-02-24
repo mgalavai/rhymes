@@ -34,6 +34,7 @@ If you run `npm run dev`, only the Vite frontend starts (no `/api` serverless ro
 - `GEMINI_MODEL`: optional text model for rhyme-word generation (default: `gemini-3.1-pro-preview`)
 - `OPENAI_API_KEY`: optional OpenAI API key for image generation
 - `OPENAI_IMAGE_MODEL`: optional OpenAI image model (default: `gpt-image-1`)
+- `OPENAI_IMAGE_SIZE`: valid OpenAI image size for `gpt-image-1` (`1024x1024`, `1024x1536`, `1536x1024`, or `auto`; default: `auto`)
 - `OPENAI_TOPIC_MODEL`: optional OpenAI text model for random topic suggestions (default: `gpt-4.1-mini`)
 - `IMAGE_PROVIDER`: `openai` or `gemini` (default: auto -> OpenAI if `OPENAI_API_KEY` exists, else Gemini)
 - `GEMINI_IMAGE_MODEL`: optional Gemini image model when provider is Gemini (default: `gemini-2.5-flash-image`)

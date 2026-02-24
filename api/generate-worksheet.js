@@ -331,7 +331,9 @@ async function callGeminiModel({ apiKey, model, body }) {
 
 async function callOpenAiImageModel({ apiKey, model, prompt }) {
   const outputFormat = String(process.env.OPENAI_IMAGE_FORMAT || 'jpeg').trim().toLowerCase()
-  const imageSize = String(process.env.OPENAI_IMAGE_SIZE || '512x512').trim() || '512x512'
+  const configuredSize = String(process.env.OPENAI_IMAGE_SIZE || 'auto').trim().toLowerCase() || 'auto'
+  const allowedSizes = new Set(['1024x1024', '1024x1536', '1536x1024', 'auto'])
+  const imageSize = allowedSizes.has(configuredSize) ? configuredSize : 'auto'
   const imageQuality = String(process.env.OPENAI_IMAGE_QUALITY || 'low').trim().toLowerCase() || 'low'
 
   const response = await fetch('https://api.openai.com/v1/images/generations', {
