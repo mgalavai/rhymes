@@ -897,10 +897,7 @@ export default async function handler(req, res) {
     }
   }
 
-  const geminiApiKey = process.env.GEMINI_API_KEY
-  if (!geminiApiKey) {
-    return res.status(500).json({ error: 'Missing server env GEMINI_API_KEY.' })
-  }
+  const geminiApiKey = process.env.GEMINI_API_KEY || ''
 
   const requestedTextModel = normalizeModelName(typeof body.model === 'string' ? body.model : '')
   const textModelCandidates = unique([
@@ -918,6 +915,16 @@ export default async function handler(req, res) {
   if (singleWordRequest) {
     const singleStartedAt = Date.now()
     let targetWord = singleWordRequest
+    const needsGeminiText = replaceWord && Boolean(pairedWordRequest)
+    const usesOpenAiImages = imageProvider === 'openai' && Boolean(openAiApiKey)
+    const needsGeminiImage = !usesOpenAiImages
+
+    if ((needsGeminiText || needsGeminiImage) && !geminiApiKey) {
+      return res.status(500).json({
+        error:
+          'Missing server env GEMINI_API_KEY. It is required for replace-word generation and Gemini image provider.',
+      })
+    }
 
     if (replaceWord && pairedWordRequest) {
       targetWord = await generateAlternativeWord({
@@ -977,6 +984,12 @@ export default async function handler(req, res) {
   }
 
   try {
+    if (!geminiApiKey) {
+      return res.status(500).json({
+        error: 'Missing server env GEMINI_API_KEY. Worksheet word generation uses Gemini text model.',
+      })
+    }
+
     const worksheetStartedAt = Date.now()
     const { worksheet, usedModel } = await generateWordWorksheet({
       apiKey: geminiApiKey,

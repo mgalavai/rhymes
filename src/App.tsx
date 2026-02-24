@@ -75,6 +75,7 @@ type GenerateParams = {
 type SingleWordImagePayload = {
   error?: string
   imageDataUrl?: unknown
+  imageDiagnostics?: unknown
 }
 
 function formatImageDiagnostics(value: unknown): string {
@@ -183,6 +184,16 @@ function sanitizeImageDataUrl(rawValue: unknown): string {
   }
 
   return ''
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
+}
+
+function isRetryableHydrationError(message: string): boolean {
+  return /rate limit|throttl|quota exceeded|retry in|429|resource exhausted/i.test(message)
 }
 
 function normalizeWorksheet(candidate: unknown, language: string, pairCount: number): WorksheetData {
@@ -307,7 +318,9 @@ async function requestSingleWordImage({
 
   const payload = (await response.json().catch(() => null)) as SingleWordImagePayload | null
   if (!response.ok) {
-    throw new Error(payload?.error ?? `Image generation failed (${response.status}).`)
+    const baseError = payload?.error ?? `Image generation failed (${response.status}).`
+    const details = formatImageDiagnostics(payload?.imageDiagnostics)
+    throw new Error(details ? `${baseError}\n${details}` : baseError)
   }
 
   return sanitizeImageDataUrl(payload?.imageDataUrl)
@@ -472,19 +485,35 @@ function App() {
     setWarningDetails('')
     let completed = 0
     const failedWords: string[] = []
+    const failedReasons: Record<string, string> = {}
     const perWordStartedAt = new Map<string, number>()
-    const concurrency = 6
+    const concurrency = 3
 
     await mapWithConcurrency(uniqueWords, concurrency, async (word) => {
       perWordStartedAt.set(word, performance.now())
       console.info('[rhymes-ui] hydrate:image-start', { word })
 
       try {
-        const imageDataUrl = await requestSingleWordImage({
-          word,
-          language,
-          topic,
-        })
+        let imageDataUrl = ''
+        let lastError = ''
+
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          try {
+            imageDataUrl = await requestSingleWordImage({
+              word,
+              language,
+              topic,
+            })
+            break
+          } catch (caughtError) {
+            lastError = caughtError instanceof Error ? caughtError.message : String(caughtError)
+            if (!isRetryableHydrationError(lastError) || attempt >= 2) {
+              throw caughtError
+            }
+            await sleep(300 * (attempt + 1))
+          }
+        }
+
         if (runToken !== generationRunRef.current) {
           return
         }
@@ -493,12 +522,15 @@ function App() {
           patchWordImageEverywhere(word, imageDataUrl)
         } else {
           failedWords.push(word)
+          failedReasons[word] = lastError || 'no image data returned'
         }
       } catch (caughtError) {
         failedWords.push(word)
+        const message = caughtError instanceof Error ? caughtError.message : String(caughtError)
+        failedReasons[word] = message.slice(0, 420)
         console.error('[rhymes-ui] hydrate:image-error', {
           word,
-          error: caughtError instanceof Error ? caughtError.message : String(caughtError),
+          error: message,
         })
       } finally {
         completed += 1
@@ -523,7 +555,7 @@ function App() {
       setWarning(
         `Some images could not be generated (${failedWords.length}/${uniqueWords.length}). You can refresh individual cards.`,
       )
-      setWarningDetails(JSON.stringify({ failedWords }, null, 2))
+      setWarningDetails(JSON.stringify({ failedWords, failedReasons }, null, 2))
     } else {
       setWarning('')
       setWarningDetails('')
