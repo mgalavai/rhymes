@@ -215,9 +215,7 @@ function summarizeImageError(errorMessage) {
   const lowerMessage = message.toLowerCase()
 
   if (/limit:\s*0/.test(lowerMessage)) {
-    const modelMatch = message.match(/model:\s*([a-z0-9.-]+)/i)
-    const modelName = modelMatch && modelMatch[1] ? modelMatch[1] : 'selected image model'
-    return `Model entitlement is 0 for ${modelName} in this project/key (not normal daily usage).`
+    return 'Image model entitlement is 0 for this project/key (not normal daily usage).'
   }
 
   if (/quota exceeded|rate limit|resource exhausted/.test(lowerMessage)) {
@@ -560,8 +558,6 @@ export default async function handler(req, res) {
   const imageModelCandidates = unique([
     requestedImageModel || 'gemini-2.5-flash-image',
     'gemini-2.5-flash-image',
-    'gemini-3-pro-image-preview',
-    'nano-banana-pro-preview',
   ])
 
   if (singleWordRequest) {
