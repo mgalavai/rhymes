@@ -790,6 +790,9 @@ function App() {
     }
   }
 
+  const isCardImageLoading = (card: ColumnCard): boolean =>
+    refreshingCardId === card.id || (isHydratingImages && !card.imageDataUrl)
+
   return (
     <div className="app-shell">
       <main className="workspace">
@@ -823,8 +826,12 @@ function App() {
                           {card.imageDataUrl ? (
                             <img src={card.imageDataUrl} alt="" loading="lazy" decoding="async" />
                           ) : (
-                            <div className="image-missing" role="img" aria-label="Image unavailable">
-                              image unavailable
+                            <div
+                              className={`image-missing ${isCardImageLoading(card) ? 'is-loading' : ''}`}
+                              role="img"
+                              aria-label={isCardImageLoading(card) ? 'Image generating' : 'Image unavailable'}
+                            >
+                              {isCardImageLoading(card) ? 'generating image...' : 'image unavailable'}
                             </div>
                           )}
                         </div>
@@ -852,8 +859,12 @@ function App() {
                           {card.imageDataUrl ? (
                             <img src={card.imageDataUrl} alt="" loading="lazy" decoding="async" />
                           ) : (
-                            <div className="image-missing" role="img" aria-label="Image unavailable">
-                              image unavailable
+                            <div
+                              className={`image-missing ${isCardImageLoading(card) ? 'is-loading' : ''}`}
+                              role="img"
+                              aria-label={isCardImageLoading(card) ? 'Image generating' : 'Image unavailable'}
+                            >
+                              {isCardImageLoading(card) ? 'generating image...' : 'image unavailable'}
                             </div>
                           )}
                         </div>
