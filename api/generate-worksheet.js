@@ -1,4 +1,4 @@
-const DEFAULT_TEXT_MODEL = process.env.GEMINI_MODEL || 'gemini-3.1-pro-preview'
+const DEFAULT_TEXT_MODEL = process.env.OPENAI_TEXT_MODEL || 'gpt-4.1-mini'
 const DEFAULT_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image'
 const DEFAULT_OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1'
 const DEFAULT_OPENAI_TOPIC_MODEL = process.env.OPENAI_TOPIC_MODEL || 'gpt-4.1-mini'
@@ -8,7 +8,7 @@ const DEFAULT_OPENAI_IMAGE_ATTEMPTS = Number(process.env.OPENAI_IMAGE_ATTEMPTS |
 const DEFAULT_OPENAI_IMAGE_CONCURRENCY = Number(process.env.OPENAI_IMAGE_CONCURRENCY || '8')
 const VERBOSE_SHEET_LOGS = String(process.env.VERBOSE_SHEET_LOGS || '1') !== '0'
 
-const TEXT_MODEL_FALLBACK_ORDER = ['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash']
+const TEXT_MODEL_FALLBACK_ORDER = ['gpt-4.1-mini', 'gpt-4.1-nano', 'gpt-4o-mini']
 
 function normalizeModelName(rawModelName) {
   const trimmed = String(rawModelName || '').trim()
@@ -257,23 +257,6 @@ function isRetryableModelError(status, errorMessage) {
   return /not found|not supported|unsupported|quota exceeded|rate limit|resource exhausted|limit:\s*0|retry in/i.test(lowerMessage)
 }
 
-function humanizeGeminiError(errorMessage, triedModels) {
-  const lowerMessage = String(errorMessage || '').toLowerCase()
-
-  if (/limit:\s*0/.test(lowerMessage)) {
-    return `The API project for this key has model entitlement set to 0 ("limit: 0"). This is usually a project/billing-tier configuration issue, not normal daily usage. Try model gemini-2.5-flash and gemini-2.5-flash-image, or enable paid access on the same Google project as this key. Tried models: ${triedModels.join(', ')}.`
-  }
-
-  if (/quota exceeded|rate limit|resource exhausted/.test(lowerMessage)) {
-    const retrySeconds = parseRetrySeconds(errorMessage)
-    return retrySeconds
-      ? `Gemini throttled this request. Retry in about ${retrySeconds}s. Tried models: ${triedModels.join(', ')}.`
-      : `Gemini throttled this request. Tried models: ${triedModels.join(', ')}.`
-  }
-
-  return `${errorMessage || 'Unknown Gemini API error.'} Tried models: ${triedModels.join(', ')}.`
-}
-
 function summarizeImageError(errorMessage) {
   const message = String(errorMessage || '')
   const lowerMessage = message.toLowerCase()
@@ -457,49 +440,39 @@ function extractImageDataFromOpenAiPayload(payload, outputFormat) {
 
 async function generateWordWorksheet({ apiKey, language, pairCount, topic, candidateModels }) {
   let lastErrorMessage = ''
-  let lastStatus = 500
 
   for (const modelName of candidateModels) {
-    const { response, payload } = await callGeminiModel({
+    const { response, payload } = await callOpenAiTextModel({
       apiKey,
       model: modelName,
-      body: {
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                text: buildPairsPrompt(language, pairCount, topic),
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: 0.4,
-        },
-      },
+      prompt: buildPairsPrompt(language, pairCount, topic),
     })
 
     if (!response.ok) {
       const errorMessage = payload && payload.error && payload.error.message
         ? payload.error.message
-        : `Gemini API request failed (${response.status}).`
+        : `OpenAI text request failed (${response.status}).`
 
       lastErrorMessage = errorMessage
-      lastStatus = response.status
 
       if (isRetryableModelError(response.status, errorMessage)) {
         continue
       }
 
-      throw new Error(humanizeGeminiError(errorMessage, [modelName]))
+      throw new Error(`${errorMessage || 'OpenAI text model error.'} Tried models: ${[modelName].join(', ')}.`)
     }
 
     try {
-      const modelText = extractTextFromPayload(payload)
+      const modelText =
+        payload &&
+        payload.choices &&
+        payload.choices[0] &&
+        payload.choices[0].message &&
+        typeof payload.choices[0].message.content === 'string'
+          ? payload.choices[0].message.content
+          : ''
       if (!modelText) {
-        throw new Error('Gemini did not return worksheet content.')
+        throw new Error('OpenAI did not return worksheet content.')
       }
 
       const worksheetJson = JSON.parse(extractJsonText(modelText))
@@ -511,11 +484,10 @@ async function generateWordWorksheet({ apiKey, language, pairCount, topic, candi
       }
     } catch (error) {
       lastErrorMessage = error instanceof Error ? error.message : 'Invalid JSON returned from model.'
-      lastStatus = 502
     }
   }
 
-  throw new Error(humanizeGeminiError(lastErrorMessage, candidateModels))
+  throw new Error(`${lastErrorMessage || 'OpenAI text request failed.'} Tried models: ${candidateModels.join(', ')}.`)
 }
 
 async function generateAlternativeWord({
@@ -529,30 +501,15 @@ async function generateAlternativeWord({
   const currentLower = cleanWord(currentWord).toLowerCase()
 
   for (const modelName of candidateModels) {
-    const { response, payload } = await callGeminiModel({
+    const { response, payload } = await callOpenAiTextModel({
       apiKey,
       model: modelName,
-      body: {
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                text: buildAlternativeWordPrompt({
-                  currentWord,
-                  pairedWord,
-                  language,
-                  topic,
-                }),
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: 0.6,
-        },
-      },
+      prompt: buildAlternativeWordPrompt({
+        currentWord,
+        pairedWord,
+        language,
+        topic,
+      }),
     })
 
     if (!response.ok) {
@@ -560,7 +517,14 @@ async function generateAlternativeWord({
     }
 
     try {
-      const modelText = extractTextFromPayload(payload)
+      const modelText =
+        payload &&
+        payload.choices &&
+        payload.choices[0] &&
+        payload.choices[0].message &&
+        typeof payload.choices[0].message.content === 'string'
+          ? payload.choices[0].message.content
+          : ''
       if (!modelText) {
         continue
       }
@@ -899,11 +863,18 @@ export default async function handler(req, res) {
     }
   }
 
+  if (!openAiApiKey) {
+    return res.status(500).json({
+      error: 'Missing server env OPENAI_API_KEY. Worksheet text generation now uses OpenAI.',
+    })
+  }
+
   const geminiApiKey = process.env.GEMINI_API_KEY || ''
 
-  const requestedTextModel = normalizeModelName(typeof body.model === 'string' ? body.model : '')
+  const requestedTextModelRaw = normalizeModelName(typeof body.model === 'string' ? body.model : '')
+  const requestedTextModel = /^gemini/i.test(requestedTextModelRaw) ? '' : requestedTextModelRaw
   const textModelCandidates = unique([
-    requestedTextModel || normalizeModelName(DEFAULT_TEXT_MODEL) || 'gemini-3.1-pro-preview',
+    requestedTextModel || normalizeModelName(DEFAULT_TEXT_MODEL) || 'gpt-4.1-mini',
     ...TEXT_MODEL_FALLBACK_ORDER,
   ])
 
@@ -917,20 +888,26 @@ export default async function handler(req, res) {
   if (singleWordRequest) {
     const singleStartedAt = Date.now()
     let targetWord = singleWordRequest
-    const needsGeminiText = replaceWord && Boolean(pairedWordRequest)
+    const needsOpenAiText = replaceWord && Boolean(pairedWordRequest)
     const usesOpenAiImages = imageProvider === 'openai' && Boolean(openAiApiKey)
     const needsGeminiImage = !usesOpenAiImages
 
-    if ((needsGeminiText || needsGeminiImage) && !geminiApiKey) {
+    if (needsOpenAiText && !openAiApiKey) {
+      return res.status(500).json({
+        error: 'Missing server env OPENAI_API_KEY. replaceWord uses OpenAI text generation.',
+      })
+    }
+
+    if (needsGeminiImage && !geminiApiKey) {
       return res.status(500).json({
         error:
-          'Missing server env GEMINI_API_KEY. It is required for replace-word generation and Gemini image provider.',
+          'Missing server env GEMINI_API_KEY. It is required when IMAGE_PROVIDER=gemini.',
       })
     }
 
     if (replaceWord && pairedWordRequest) {
       targetWord = await generateAlternativeWord({
-        apiKey: geminiApiKey,
+        apiKey: openAiApiKey,
         currentWord: singleWordRequest,
         pairedWord: pairedWordRequest,
         language,
@@ -986,15 +963,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    if (!geminiApiKey) {
-      return res.status(500).json({
-        error: 'Missing server env GEMINI_API_KEY. Worksheet word generation uses Gemini text model.',
-      })
-    }
-
     const worksheetStartedAt = Date.now()
     const { worksheet, usedModel } = await generateWordWorksheet({
-      apiKey: geminiApiKey,
+      apiKey: openAiApiKey,
       language,
       pairCount,
       topic,

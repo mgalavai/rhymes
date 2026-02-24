@@ -1,7 +1,7 @@
 import { type CSSProperties, useRef, useState } from 'react'
 import './App.css'
 
-const DEFAULT_MODEL = 'gemini-3.1-pro-preview'
+const DEFAULT_MODEL = 'gpt-4.1-mini'
 
 const LANGUAGE_OPTIONS = [
   'English',
@@ -972,10 +972,10 @@ function App() {
           </div>
         ) : null}
         <p className="help-text">
-          API keys stay server-side (<code>GEMINI_API_KEY</code>, optionally <code>OPENAI_API_KEY</code>).
-          Text generation uses <code>{DEFAULT_MODEL}</code>. Image generation uses OpenAI when available
-          (<code>OPENAI_IMAGE_MODEL</code>, default: <code>gpt-image-1</code>) or Gemini via
-          <code>GEMINI_IMAGE_MODEL</code> (default: <code>gemini-2.5-flash-image</code>).
+          API keys stay server-side (<code>OPENAI_API_KEY</code>; optional <code>GEMINI_API_KEY</code>
+          only for Gemini image fallback). Text generation uses OpenAI model <code>{DEFAULT_MODEL}</code>.
+          Images use OpenAI by default (<code>OPENAI_IMAGE_MODEL</code>, default: <code>gpt-image-1</code>)
+          or Gemini via <code>IMAGE_PROVIDER=gemini</code> + <code>GEMINI_IMAGE_MODEL</code>.
         </p>
       </aside>
     </div>
