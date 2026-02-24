@@ -3,7 +3,7 @@
 A small React app that generates printable rhyming worksheets for children (6-8 years old) using Gemini.
 
 Each generated page has:
-- 8 or 10 illustrated vocabulary cards
+- 6, 8, or 10 illustrated vocabulary cards
 - Two columns for rhyming-word matching
 - Print-friendly layout for PDF export
 
@@ -39,7 +39,7 @@ For Vercel, add the same variables in Project Settings -> Environment Variables.
 
 1. Add `GEMINI_API_KEY`, optional `GEMINI_MODEL`, and optional `GEMINI_IMAGE_MODEL` in `.env` or Vercel env settings.
 2. Set text model in UI (default is `gemini-3.1-pro-preview`).
-3. Choose language, card count (8 or 10), and topic.
+3. Choose language, card count (6, 8, or 10), and topic.
 4. Click `Generate Page`.
 5. Click `Save as PDF` to export.
 

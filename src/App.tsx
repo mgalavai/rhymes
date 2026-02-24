@@ -16,6 +16,14 @@ const LANGUAGE_OPTIONS = [
   'Polish',
 ]
 
+const CARD_OPTIONS = [
+  { pairs: 3, label: '6 cards' },
+  { pairs: 4, label: '8 cards' },
+  { pairs: 5, label: '10 cards' },
+] as const
+
+type PairCountOption = (typeof CARD_OPTIONS)[number]['pairs']
+
 type WordIllustration = {
   word: string
   imageDataUrl: string
@@ -241,7 +249,7 @@ function toColumnCards(worksheet: WorksheetData): { left: ColumnCard[]; right: C
 
 function App() {
   const [language, setLanguage] = useState('English')
-  const [pairCount, setPairCount] = useState(5)
+  const [pairCount, setPairCount] = useState<PairCountOption>(5)
   const [topic, setTopic] = useState('animals and everyday objects')
   const [worksheet, setWorksheet] = useState<WorksheetData | null>(null)
   const [cards, setCards] = useState<{ left: ColumnCard[]; right: ColumnCard[] } | null>(null)
@@ -515,13 +523,23 @@ function App() {
 
         <label>
           Cards
-          <select
-            value={pairCount}
-            onChange={(event) => setPairCount(Number(event.target.value) as 4 | 5)}
-          >
-            <option value={4}>8 cards</option>
-            <option value={5}>10 cards</option>
-          </select>
+          <div className="cards-tabs" role="tablist" aria-label="Cards per worksheet">
+            {CARD_OPTIONS.map((option) => {
+              const isActive = pairCount === option.pairs
+              return (
+                <button
+                  key={option.pairs}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  className={`cards-tab ${isActive ? 'is-active' : ''}`}
+                  onClick={() => setPairCount(option.pairs)}
+                >
+                  {option.label}
+                </button>
+              )
+            })}
+          </div>
         </label>
 
         <label className="topic-field">

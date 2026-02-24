@@ -543,7 +543,8 @@ export default async function handler(req, res) {
 
   const language = typeof body.language === 'string' && body.language.trim() ? body.language.trim() : 'English'
   const topic = typeof body.topic === 'string' ? body.topic.trim() : ''
-  const pairCount = body.pairCount === 4 ? 4 : 5
+  const parsedPairCount = Number(body.pairCount)
+  const pairCount = [3, 4, 5].includes(parsedPairCount) ? parsedPairCount : 5
   const singleWordRequest = typeof body.word === 'string' ? cleanWord(body.word) : ''
   const pairedWordRequest = typeof body.pairedWord === 'string' ? cleanWord(body.pairedWord) : ''
   const replaceWord = body.replaceWord === true
