@@ -182,6 +182,33 @@
   font-weight: 700;
 }
 
+.warning-box p {
+  margin: 0;
+}
+
+.warning-details {
+  margin-top: 0.45rem;
+  font-weight: 500;
+}
+
+.warning-details summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.warning-details pre {
+  margin: 0.4rem 0 0;
+  padding: 0.45rem;
+  background: rgb(255 255 255 / 70%);
+  border: 1px solid #dfc48f;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: #624316;
+}
+
 .help-text {
   margin: 0;
   color: var(--ink-soft);

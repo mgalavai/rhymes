@@ -237,6 +237,17 @@ function summarizeMissingImageReasons(imageResults) {
     )
 }
 
+function collectImageFailureDiagnostics(imageResults) {
+  return imageResults
+    .filter((item) => item && (!item.image || !item.image.imageDataUrl))
+    .slice(0, 5)
+    .map((item) => ({
+      word: item.word,
+      error: item.image && item.image.error ? String(item.image.error) : 'no image returned',
+      attempts: item.image && Array.isArray(item.image.debugAttempts) ? item.image.debugAttempts.slice(-3) : [],
+    }))
+}
+
 async function callGeminiModel({ apiKey, model, body }) {
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
@@ -463,7 +474,7 @@ async function generateWordImage({ apiKey, word, language, topic, candidateModel
           continue
         }
 
-        return { error: errorMessage }
+        return { error: errorMessage, debugAttempts: attemptErrors.slice(-6) }
       }
 
       const image = extractImageDataFromPayload(payload)
@@ -472,6 +483,7 @@ async function generateWordImage({ apiKey, word, language, topic, candidateModel
           imageDataUrl: image.dataUrl,
           mimeType: image.mimeType,
           usedModel: modelName,
+          debugAttempts: attemptErrors.slice(-6),
         }
       }
 
@@ -494,6 +506,7 @@ async function generateWordImage({ apiKey, word, language, topic, candidateModel
       (attemptErrors.length > 0
         ? attemptErrors.slice(-3).join(' | ')
         : 'Model returned no image data for this word.'),
+    debugAttempts: attemptErrors.slice(-6),
   }
 }
 
@@ -555,6 +568,7 @@ export default async function handler(req, res) {
   ])
 
   const requestedImageModel = normalizeImageModelName(DEFAULT_IMAGE_MODEL)
+  const rawImageModelEnv = process.env.GEMINI_IMAGE_MODEL || '(unset)'
   const imageModelCandidates = unique([
     requestedImageModel || 'gemini-2.5-flash-image',
     'gemini-2.5-flash-image',
@@ -596,6 +610,13 @@ export default async function handler(req, res) {
       error: `Unable to generate an alternative image for "${targetWord}". ${summarizeImageError(
         image && image.error ? image.error : 'no image returned',
       )}`,
+      imageDiagnostics: {
+        rawImageModelEnv,
+        normalizedImageModel: requestedImageModel,
+        imageModelCandidates,
+        sampleAttempts:
+          image && Array.isArray(image.debugAttempts) ? image.debugAttempts.slice(-3) : [],
+      },
     })
   }
 
@@ -633,6 +654,7 @@ export default async function handler(req, res) {
 
     const missingWords = uniqueWords.filter((word) => !wordToImage.has(word))
     const missingReasons = summarizeMissingImageReasons(imageResults)
+    const failureDiagnostics = collectImageFailureDiagnostics(imageResults)
 
     const enrichedPairs = worksheet.pairs.map((pair) => {
       const leftImage = wordToImage.get(pair.left.word)
@@ -666,6 +688,16 @@ export default async function handler(req, res) {
               missingReasons.length > 0 ? ` Details: ${missingReasons.join(' || ')}` : ''
             }`
           : '',
+      imageDiagnostics:
+        missingWords.length > 0
+          ? {
+              rawImageModelEnv,
+              normalizedImageModel: requestedImageModel,
+              imageModelCandidates,
+              missingWords,
+              sampleFailures: failureDiagnostics,
+            }
+          : null,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Worksheet generation failed.'

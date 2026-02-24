@@ -47,6 +47,7 @@ type GenerateWorksheetPayload = {
   error?: string
   worksheet?: unknown
   imageWarning?: string
+  imageDiagnostics?: unknown
 }
 
 type ColumnCard = {
@@ -62,6 +63,18 @@ type GenerateParams = {
   language: string
   pairCount: number
   topic: string
+}
+
+function formatImageDiagnostics(value: unknown): string {
+  if (!value) {
+    return ''
+  }
+
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return String(value)
+  }
 }
 
 function RefreshIcon() {
@@ -189,7 +202,7 @@ async function generateWorksheetWithGemini({
   language,
   pairCount,
   topic,
-}: GenerateParams): Promise<{ worksheet: WorksheetData; imageWarning: string }> {
+}: GenerateParams): Promise<{ worksheet: WorksheetData; imageWarning: string; imageDiagnostics: string }> {
   if (!model.trim()) {
     throw new Error('Model name is required.')
   }
@@ -221,6 +234,7 @@ async function generateWorksheetWithGemini({
     worksheet: normalizeWorksheet(payload?.worksheet, language, pairCount),
     imageWarning:
       typeof payload?.imageWarning === 'string' ? payload.imageWarning.trim() : '',
+    imageDiagnostics: formatImageDiagnostics(payload?.imageDiagnostics),
   }
 }
 
@@ -257,11 +271,13 @@ function App() {
   const [refreshingCardId, setRefreshingCardId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [warning, setWarning] = useState('')
+  const [warningDetails, setWarningDetails] = useState('')
 
   const handleGenerate = async () => {
     setIsLoading(true)
     setError('')
     setWarning('')
+    setWarningDetails('')
 
     try {
       const generated = await generateWorksheetWithGemini({
@@ -273,7 +289,8 @@ function App() {
 
       setWorksheet(generated.worksheet)
       setCards(toColumnCards(generated.worksheet))
-      setWarning(generated.imageWarning.split(' Details:')[0].trim())
+      setWarning(generated.imageWarning)
+      setWarningDetails(generated.imageDiagnostics)
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : 'Generation failed.'
       setError(message)
@@ -324,11 +341,14 @@ function App() {
               error?: string
               imageDataUrl?: unknown
               word?: unknown
+              imageDiagnostics?: unknown
             }
           | null
 
         if (!response.ok) {
-          throw new Error(payload?.error ?? `Could not refresh "${card.word}" card.`)
+          const details = formatImageDiagnostics(payload?.imageDiagnostics)
+          const baseError = payload?.error ?? `Could not refresh "${card.word}" card.`
+          throw new Error(details ? `${baseError}\n\n${details}` : baseError)
         }
 
         const nextImageDataUrl = sanitizeImageDataUrl(payload?.imageDataUrl)
@@ -564,7 +584,17 @@ function App() {
         </div>
 
         {error ? <p className="error-box">{error}</p> : null}
-        {!error && warning ? <p className="warning-box">{warning}</p> : null}
+        {!error && warning ? (
+          <div className="warning-box">
+            <p>{warning}</p>
+            {warningDetails ? (
+              <details className="warning-details">
+                <summary>Technical details</summary>
+                <pre>{warningDetails}</pre>
+              </details>
+            ) : null}
+          </div>
+        ) : null}
         <p className="help-text">
           API key is server-side only (<code>GEMINI_API_KEY</code>). Text generation uses
           <code>{DEFAULT_MODEL}</code>; icons use <code>GEMINI_IMAGE_MODEL</code> (default:
