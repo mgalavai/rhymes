@@ -273,7 +273,7 @@ function App() {
 
       setWorksheet(generated.worksheet)
       setCards(toColumnCards(generated.worksheet))
-      setWarning(generated.imageWarning)
+      setWarning(generated.imageWarning.split(' Details:')[0].trim())
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : 'Generation failed.'
       setError(message)

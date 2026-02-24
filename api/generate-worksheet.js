@@ -666,7 +666,9 @@ export default async function handler(req, res) {
       usedImageModels: imageModelCandidates,
       imageWarning:
         missingWords.length > 0
-          ? `Some images could not be generated (${missingWords.join(', ')}). You can still print the worksheet and refresh individual cards later. Details: ${missingReasons.join(' || ')}`
+          ? `Some images could not be generated (${missingWords.length}/${uniqueWords.length}). You can still print the worksheet and refresh individual cards later.${
+              missingReasons.length > 0 ? ` Details: ${missingReasons.join(' || ')}` : ''
+            }`
           : '',
     })
   } catch (error) {
