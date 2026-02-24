@@ -1,8 +1,12 @@
 const DEFAULT_TEXT_MODEL = process.env.GEMINI_MODEL || 'gemini-3.1-pro-preview'
 const DEFAULT_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image'
 const DEFAULT_OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1'
+const DEFAULT_OPENAI_TOPIC_MODEL = process.env.OPENAI_TOPIC_MODEL || 'gpt-4.1-mini'
 const DEFAULT_IMAGE_ATTEMPTS = Number(process.env.GEMINI_IMAGE_ATTEMPTS || '1')
 const DEFAULT_IMAGE_CONCURRENCY = Number(process.env.GEMINI_IMAGE_CONCURRENCY || '4')
+const DEFAULT_OPENAI_IMAGE_ATTEMPTS = Number(process.env.OPENAI_IMAGE_ATTEMPTS || '1')
+const DEFAULT_OPENAI_IMAGE_CONCURRENCY = Number(process.env.OPENAI_IMAGE_CONCURRENCY || '8')
+const VERBOSE_SHEET_LOGS = String(process.env.VERBOSE_SHEET_LOGS || '1') !== '0'
 
 const TEXT_MODEL_FALLBACK_ORDER = ['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash']
 
@@ -28,6 +32,25 @@ function normalizeImageModelName(rawModelName) {
 
 function unique(items) {
   return Array.from(new Set(items.filter(Boolean)))
+}
+
+function logVerbose(requestId, stage, payload = null) {
+  if (!VERBOSE_SHEET_LOGS) {
+    return
+  }
+
+  const prefix = `[sheet:${requestId}] ${stage}`
+  if (payload && typeof payload === 'object') {
+    console.info(prefix, payload)
+    return
+  }
+
+  if (payload !== null && payload !== undefined) {
+    console.info(prefix, String(payload))
+    return
+  }
+
+  console.info(prefix)
 }
 
 function normalizeImageProvider(rawProvider, openAiApiKey) {
@@ -76,6 +99,21 @@ function buildPairsPrompt(language, pairCount, topic) {
     '- Keep words short when possible and avoid offensive or abstract vocabulary.',
     '- Avoid duplicates across all words in the worksheet.',
     '- Do not include markdown fences or explanations, output JSON only.',
+  ].join('\n')
+}
+
+function buildRandomTopicPrompt(language, currentTopic) {
+  return [
+    'Generate one fresh worksheet topic for children aged 6-8.',
+    `Target language: ${language}.`,
+    currentTopic ? `Current topic to avoid repeating: ${currentTopic}.` : 'Avoid generic repeated topics.',
+    'Return JSON only:',
+    '{"topic":"short topic phrase"}',
+    'Rules:',
+    '- 2 to 6 words.',
+    '- Child-friendly nouns/domains that are easy to illustrate.',
+    '- No punctuation-heavy formatting.',
+    '- Keep it broad enough for rhyming noun pairs.',
   ].join('\n')
 }
 
@@ -293,7 +331,7 @@ async function callGeminiModel({ apiKey, model, body }) {
 
 async function callOpenAiImageModel({ apiKey, model, prompt }) {
   const outputFormat = String(process.env.OPENAI_IMAGE_FORMAT || 'jpeg').trim().toLowerCase()
-  const imageSize = String(process.env.OPENAI_IMAGE_SIZE || '1024x1024').trim() || '1024x1024'
+  const imageSize = String(process.env.OPENAI_IMAGE_SIZE || '512x512').trim() || '512x512'
   const imageQuality = String(process.env.OPENAI_IMAGE_QUALITY || 'low').trim().toLowerCase() || 'low'
 
   const response = await fetch('https://api.openai.com/v1/images/generations', {
@@ -315,6 +353,35 @@ async function callOpenAiImageModel({ apiKey, model, prompt }) {
   const payload = await response.json().catch(() => null)
 
   return { response, payload, outputFormat }
+}
+
+async function callOpenAiTextModel({ apiKey, model, prompt }) {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.9,
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You produce concise structured JSON for children worksheet planning. Output valid JSON only.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+    }),
+  })
+
+  const payload = await response.json().catch(() => null)
+  return { response, payload }
 }
 
 function extractTextFromPayload(payload) {
@@ -508,6 +575,49 @@ async function generateAlternativeWord({
   }
 
   return cleanWord(currentWord)
+}
+
+async function generateRandomTopicWithOpenAi({
+  apiKey,
+  model,
+  language,
+  currentTopic,
+}) {
+  const { response, payload } = await callOpenAiTextModel({
+    apiKey,
+    model,
+    prompt: buildRandomTopicPrompt(language, currentTopic),
+  })
+
+  if (!response.ok) {
+    const errorMessage =
+      payload && payload.error && payload.error.message
+        ? payload.error.message
+        : `OpenAI topic request failed (${response.status}).`
+    throw new Error(errorMessage)
+  }
+
+  const messageText =
+    payload &&
+    payload.choices &&
+    payload.choices[0] &&
+    payload.choices[0].message &&
+    typeof payload.choices[0].message.content === 'string'
+      ? payload.choices[0].message.content
+      : ''
+
+  if (!messageText) {
+    throw new Error('OpenAI did not return topic content.')
+  }
+
+  const parsed = JSON.parse(extractJsonText(messageText))
+  const topic = typeof parsed.topic === 'string' ? parsed.topic.trim() : ''
+
+  if (!topic) {
+    throw new Error('OpenAI returned an empty topic.')
+  }
+
+  return topic
 }
 
 async function generateWordImageWithGemini({
@@ -704,32 +814,93 @@ async function mapWithConcurrency(items, concurrency, mapper) {
 }
 
 export default async function handler(req, res) {
+  const requestId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+  const requestStartedAt = Date.now()
+
   if (req.method !== 'POST') {
+    logVerbose(requestId, 'reject:method', { method: req.method })
     res.setHeader('Allow', 'POST')
     return res.status(405).json({ error: 'Method not allowed.' })
   }
-
-  const geminiApiKey = process.env.GEMINI_API_KEY
-  if (!geminiApiKey) {
-    return res.status(500).json({ error: 'Missing server env GEMINI_API_KEY.' })
-  }
-  const openAiApiKey = process.env.OPENAI_API_KEY || ''
 
   let body = {}
   try {
     body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {}
   } catch {
+    logVerbose(requestId, 'reject:invalid-json')
     return res.status(400).json({ error: 'Invalid JSON body.' })
   }
 
+  const openAiApiKey = process.env.OPENAI_API_KEY || ''
   const language = typeof body.language === 'string' && body.language.trim() ? body.language.trim() : 'English'
   const topic = typeof body.topic === 'string' ? body.topic.trim() : ''
+  const randomizeTopic = body.randomizeTopic === true
+  const deferImages = body.deferImages === true
   const parsedPairCount = Number(body.pairCount)
   const pairCount = [3, 4, 5].includes(parsedPairCount) ? parsedPairCount : 5
   const singleWordRequest = typeof body.word === 'string' ? cleanWord(body.word) : ''
   const pairedWordRequest = typeof body.pairedWord === 'string' ? cleanWord(body.pairedWord) : ''
   const replaceWord = body.replaceWord === true
   const variationHint = typeof body.variationHint === 'string' ? body.variationHint.trim() : ''
+  const imageProvider = normalizeImageProvider(process.env.IMAGE_PROVIDER, openAiApiKey)
+  const openAiImageModel = String(DEFAULT_OPENAI_IMAGE_MODEL || 'gpt-image-1').trim() || 'gpt-image-1'
+  const openAiTopicModel = String(DEFAULT_OPENAI_TOPIC_MODEL || 'gpt-4.1-mini').trim() || 'gpt-4.1-mini'
+  const geminiImageAttempts = toBoundedInteger(DEFAULT_IMAGE_ATTEMPTS, 1, 1, 3)
+  const geminiImageConcurrency = toBoundedInteger(DEFAULT_IMAGE_CONCURRENCY, 4, 1, 8)
+  const openAiImageAttempts = toBoundedInteger(DEFAULT_OPENAI_IMAGE_ATTEMPTS, 1, 1, 3)
+  const openAiImageConcurrency = toBoundedInteger(DEFAULT_OPENAI_IMAGE_CONCURRENCY, 8, 1, 12)
+  const imageAttempts = imageProvider === 'openai' ? openAiImageAttempts : geminiImageAttempts
+  const imageConcurrency = imageProvider === 'openai' ? openAiImageConcurrency : geminiImageConcurrency
+
+  logVerbose(requestId, 'start', {
+    language,
+    pairCount,
+    topic,
+    randomizeTopic,
+    deferImages,
+    singleWordRequest: Boolean(singleWordRequest),
+    replaceWord,
+    imageProvider,
+    imageConcurrency,
+    imageAttempts,
+  })
+
+  if (randomizeTopic) {
+    if (!openAiApiKey) {
+      return res.status(500).json({ error: 'Missing server env OPENAI_API_KEY for topic randomization.' })
+    }
+
+    const topicStartedAt = Date.now()
+    try {
+      const nextTopic = await generateRandomTopicWithOpenAi({
+        apiKey: openAiApiKey,
+        model: openAiTopicModel,
+        language,
+        currentTopic: topic,
+      })
+
+      logVerbose(requestId, 'topic-randomized', {
+        durationMs: Date.now() - topicStartedAt,
+        topic: nextTopic,
+      })
+      return res.status(200).json({
+        topic: nextTopic,
+        source: `openai:${openAiTopicModel}`,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Topic randomization failed.'
+      logVerbose(requestId, 'topic-randomize:error', {
+        durationMs: Date.now() - topicStartedAt,
+        error: message,
+      })
+      return res.status(502).json({ error: message })
+    }
+  }
+
+  const geminiApiKey = process.env.GEMINI_API_KEY
+  if (!geminiApiKey) {
+    return res.status(500).json({ error: 'Missing server env GEMINI_API_KEY.' })
+  }
 
   const requestedTextModel = normalizeModelName(typeof body.model === 'string' ? body.model : '')
   const textModelCandidates = unique([
@@ -738,10 +909,6 @@ export default async function handler(req, res) {
   ])
 
   const requestedImageModel = normalizeImageModelName(DEFAULT_IMAGE_MODEL)
-  const imageAttempts = toBoundedInteger(DEFAULT_IMAGE_ATTEMPTS, 1, 1, 3)
-  const imageConcurrency = toBoundedInteger(DEFAULT_IMAGE_CONCURRENCY, 4, 1, 8)
-  const imageProvider = normalizeImageProvider(process.env.IMAGE_PROVIDER, openAiApiKey)
-  const openAiImageModel = String(DEFAULT_OPENAI_IMAGE_MODEL || 'gpt-image-1').trim() || 'gpt-image-1'
   const rawImageModelEnv = process.env.GEMINI_IMAGE_MODEL || '(unset)'
   const imageModelCandidates = unique([
     requestedImageModel || 'gemini-2.5-flash-image',
@@ -749,6 +916,7 @@ export default async function handler(req, res) {
   ])
 
   if (singleWordRequest) {
+    const singleStartedAt = Date.now()
     let targetWord = singleWordRequest
 
     if (replaceWord && pairedWordRequest) {
@@ -776,6 +944,12 @@ export default async function handler(req, res) {
     })
 
     if (image && image.imageDataUrl) {
+      logVerbose(requestId, 'single-word:done', {
+        word: targetWord,
+        durationMs: Date.now() - singleStartedAt,
+        provider: imageProvider,
+        model: image.usedModel || '(unknown)',
+      })
       return res.status(200).json({
         word: targetWord,
         imageDataUrl: image.imageDataUrl,
@@ -803,6 +977,7 @@ export default async function handler(req, res) {
   }
 
   try {
+    const worksheetStartedAt = Date.now()
     const { worksheet, usedModel } = await generateWordWorksheet({
       apiKey: geminiApiKey,
       language,
@@ -810,13 +985,56 @@ export default async function handler(req, res) {
       topic,
       candidateModels: textModelCandidates,
     })
+    logVerbose(requestId, 'worksheet:words-ready', {
+      durationMs: Date.now() - worksheetStartedAt,
+      usedModel,
+    })
+
+    if (deferImages) {
+      const emptyPairs = worksheet.pairs.map((pair) => ({
+        ...pair,
+        left: {
+          ...pair.left,
+          imageDataUrl: '',
+          mimeType: '',
+        },
+        right: {
+          ...pair.right,
+          imageDataUrl: '',
+          mimeType: '',
+        },
+      }))
+
+      logVerbose(requestId, 'worksheet:defer-images-return', {
+        totalMs: Date.now() - requestStartedAt,
+        pairCount: emptyPairs.length,
+      })
+      return res.status(200).json({
+        worksheet: {
+          ...worksheet,
+          pairs: emptyPairs,
+        },
+        usedTextModel: usedModel,
+        usedImageModels: [],
+        imageWarning: '',
+        imageDiagnostics: null,
+        deferredImages: true,
+      })
+    }
 
     const uniqueWords = unique(
       worksheet.pairs.flatMap((pair) => [pair.left.word, pair.right.word]).map((word) => cleanWord(word)),
     )
 
     const wordToImage = new Map()
+    logVerbose(requestId, 'worksheet:image-batch-start', {
+      words: uniqueWords.length,
+      provider: imageProvider,
+      imageConcurrency,
+      imageAttempts,
+    })
     const imageResults = await mapWithConcurrency(uniqueWords, imageConcurrency, async (word) => {
+      const imageStartedAt = Date.now()
       const image = await generateWordImage({
         imageProvider,
         geminiApiKey,
@@ -827,6 +1045,13 @@ export default async function handler(req, res) {
         topic,
         candidateModels: imageModelCandidates,
         maxAttemptsPerModel: imageAttempts,
+      })
+
+      logVerbose(requestId, 'worksheet:image-word-done', {
+        word,
+        durationMs: Date.now() - imageStartedAt,
+        ok: Boolean(image && image.imageDataUrl),
+        model: image && image.usedModel ? image.usedModel : '(none)',
       })
 
       return { word, image }
@@ -841,6 +1066,10 @@ export default async function handler(req, res) {
     const missingWords = uniqueWords.filter((word) => !wordToImage.has(word))
     const missingReasons = summarizeMissingImageReasons(imageResults)
     const failureDiagnostics = collectImageFailureDiagnostics(imageResults)
+    logVerbose(requestId, 'worksheet:image-batch-finish', {
+      totalWords: uniqueWords.length,
+      missingWords: missingWords.length,
+    })
 
     const enrichedPairs = worksheet.pairs.map((pair) => {
       const leftImage = wordToImage.get(pair.left.word)
@@ -861,6 +1090,11 @@ export default async function handler(req, res) {
       }
     })
 
+    logVerbose(requestId, 'done', {
+      durationMs: Date.now() - requestStartedAt,
+      usedTextModel: usedModel,
+      missingWords: missingWords.length,
+    })
     return res.status(200).json({
       worksheet: {
         ...worksheet,
@@ -891,6 +1125,10 @@ export default async function handler(req, res) {
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Worksheet generation failed.'
+    logVerbose(requestId, 'error', {
+      durationMs: Date.now() - requestStartedAt,
+      message,
+    })
     return res.status(502).json({ error: message })
   }
 }
