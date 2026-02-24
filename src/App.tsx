@@ -246,7 +246,7 @@ function normalizeWorksheet(candidate: unknown, language: string, pairCount: num
   }
 }
 
-async function generateWorksheetWithGemini({
+async function generateWorksheet({
   model,
   language,
   pairCount,
@@ -576,7 +576,7 @@ function App() {
     setWarningDetails('')
 
     try {
-      const generated = await generateWorksheetWithGemini({
+      const generated = await generateWorksheet({
         model: DEFAULT_MODEL,
         language,
         pairCount,
@@ -972,10 +972,8 @@ function App() {
           </div>
         ) : null}
         <p className="help-text">
-          API keys stay server-side (<code>OPENAI_API_KEY</code>; optional <code>GEMINI_API_KEY</code>
-          only for Gemini image fallback). Text generation uses OpenAI model <code>{DEFAULT_MODEL}</code>.
-          Images use OpenAI by default (<code>OPENAI_IMAGE_MODEL</code>, default: <code>gpt-image-1</code>)
-          or Gemini via <code>IMAGE_PROVIDER=gemini</code> + <code>GEMINI_IMAGE_MODEL</code>.
+          API key stays server-side (<code>OPENAI_API_KEY</code>). Text generation uses
+          <code>{DEFAULT_MODEL}</code>; images use <code>gpt-image-1</code>.
         </p>
       </aside>
     </div>
