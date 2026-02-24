@@ -599,9 +599,10 @@ function App() {
           </div>
         ) : null}
         <p className="help-text">
-          API key is server-side only (<code>GEMINI_API_KEY</code>). Text generation uses
-          <code>{DEFAULT_MODEL}</code>; icons use <code>GEMINI_IMAGE_MODEL</code> (default:
-          <code>gemini-2.5-flash-image</code>).
+          API keys stay server-side (<code>GEMINI_API_KEY</code>, optionally <code>OPENAI_API_KEY</code>).
+          Text generation uses <code>{DEFAULT_MODEL}</code>. Image generation uses OpenAI when available
+          (<code>OPENAI_IMAGE_MODEL</code>, default: <code>gpt-image-1</code>) or Gemini via
+          <code>GEMINI_IMAGE_MODEL</code> (default: <code>gemini-2.5-flash-image</code>).
         </p>
       </aside>
     </div>

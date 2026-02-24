@@ -1,5 +1,6 @@
 const DEFAULT_TEXT_MODEL = process.env.GEMINI_MODEL || 'gemini-3.1-pro-preview'
 const DEFAULT_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image'
+const DEFAULT_OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1'
 const DEFAULT_IMAGE_ATTEMPTS = Number(process.env.GEMINI_IMAGE_ATTEMPTS || '1')
 const DEFAULT_IMAGE_CONCURRENCY = Number(process.env.GEMINI_IMAGE_CONCURRENCY || '4')
 
@@ -27,6 +28,16 @@ function normalizeImageModelName(rawModelName) {
 
 function unique(items) {
   return Array.from(new Set(items.filter(Boolean)))
+}
+
+function normalizeImageProvider(rawProvider, openAiApiKey) {
+  const normalized = String(rawProvider || '').trim().toLowerCase()
+
+  if (normalized === 'gemini' || normalized === 'openai') {
+    return normalized
+  }
+
+  return openAiApiKey ? 'openai' : 'gemini'
 }
 
 function toBoundedInteger(value, fallback, min, max) {
@@ -280,6 +291,32 @@ async function callGeminiModel({ apiKey, model, body }) {
   return { response, payload }
 }
 
+async function callOpenAiImageModel({ apiKey, model, prompt }) {
+  const outputFormat = String(process.env.OPENAI_IMAGE_FORMAT || 'jpeg').trim().toLowerCase()
+  const imageSize = String(process.env.OPENAI_IMAGE_SIZE || '1024x1024').trim() || '1024x1024'
+  const imageQuality = String(process.env.OPENAI_IMAGE_QUALITY || 'low').trim().toLowerCase() || 'low'
+
+  const response = await fetch('https://api.openai.com/v1/images/generations', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      prompt,
+      size: imageSize,
+      quality: imageQuality,
+      output_format: outputFormat,
+      background: 'opaque',
+    }),
+  })
+
+  const payload = await response.json().catch(() => null)
+
+  return { response, payload, outputFormat }
+}
+
 function extractTextFromPayload(payload) {
   return (payload && payload.candidates ? payload.candidates : [])
     .flatMap((candidate) => (candidate && candidate.content && candidate.content.parts ? candidate.content.parts : []))
@@ -319,6 +356,30 @@ function extractImageDataFromPayload(payload) {
         mimeType,
         dataUrl: String(uri),
       }
+    }
+  }
+
+  return null
+}
+
+function extractImageDataFromOpenAiPayload(payload, outputFormat) {
+  const first = payload && Array.isArray(payload.data) ? payload.data[0] : null
+  if (!first) {
+    return null
+  }
+
+  if (first.b64_json) {
+    const mimeType = outputFormat === 'png' ? 'image/png' : 'image/jpeg'
+    return {
+      mimeType,
+      dataUrl: `data:${mimeType};base64,${first.b64_json}`,
+    }
+  }
+
+  if (first.url && /^https?:\/\//i.test(String(first.url))) {
+    return {
+      mimeType: 'image/png',
+      dataUrl: String(first.url),
     }
   }
 
@@ -449,7 +510,7 @@ async function generateAlternativeWord({
   return cleanWord(currentWord)
 }
 
-async function generateWordImage({
+async function generateWordImageWithGemini({
   apiKey,
   word,
   language,
@@ -533,6 +594,91 @@ async function generateWordImage({
   }
 }
 
+async function generateWordImageWithOpenAi({
+  apiKey,
+  word,
+  language,
+  topic,
+  model,
+  variationHint = '',
+  maxAttempts = 1,
+}) {
+  const attemptErrors = []
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const prompt = buildImagePrompt(word, language, topic, variationHint)
+    const { response, payload, outputFormat } = await callOpenAiImageModel({
+      apiKey,
+      model,
+      prompt,
+    })
+
+    if (!response.ok) {
+      const errorMessage = payload && payload.error && payload.error.message
+        ? payload.error.message
+        : `OpenAI image request failed (${response.status}).`
+      attemptErrors.push(`openai ${model} (attempt ${attempt + 1}): ${errorMessage}`)
+      if (isRetryableModelError(response.status, errorMessage)) {
+        continue
+      }
+      return { error: errorMessage, debugAttempts: attemptErrors.slice(-6) }
+    }
+
+    const image = extractImageDataFromOpenAiPayload(payload, outputFormat)
+    if (image && image.dataUrl) {
+      return {
+        imageDataUrl: image.dataUrl,
+        mimeType: image.mimeType,
+        usedModel: model,
+        debugAttempts: attemptErrors.slice(-6),
+      }
+    }
+
+    const payloadError = payload && payload.error && payload.error.message ? payload.error.message : 'No image returned.'
+    attemptErrors.push(`openai ${model} (attempt ${attempt + 1}): ${payloadError}`)
+  }
+
+  return {
+    error: attemptErrors.length > 0 ? attemptErrors.slice(-3).join(' | ') : 'OpenAI returned no image data.',
+    debugAttempts: attemptErrors.slice(-6),
+  }
+}
+
+async function generateWordImage({
+  imageProvider,
+  geminiApiKey,
+  openAiApiKey,
+  openAiImageModel,
+  word,
+  language,
+  topic,
+  candidateModels,
+  variationHint = '',
+  maxAttemptsPerModel = 1,
+}) {
+  if (imageProvider === 'openai' && openAiApiKey) {
+    return generateWordImageWithOpenAi({
+      apiKey: openAiApiKey,
+      model: openAiImageModel,
+      word,
+      language,
+      topic,
+      variationHint,
+      maxAttempts: maxAttemptsPerModel,
+    })
+  }
+
+  return generateWordImageWithGemini({
+    apiKey: geminiApiKey,
+    word,
+    language,
+    topic,
+    candidateModels,
+    variationHint,
+    maxAttemptsPerModel,
+  })
+}
+
 async function mapWithConcurrency(items, concurrency, mapper) {
   const results = new Array(items.length)
   let nextIndex = 0
@@ -563,10 +709,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed.' })
   }
 
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) {
+  const geminiApiKey = process.env.GEMINI_API_KEY
+  if (!geminiApiKey) {
     return res.status(500).json({ error: 'Missing server env GEMINI_API_KEY.' })
   }
+  const openAiApiKey = process.env.OPENAI_API_KEY || ''
 
   let body = {}
   try {
@@ -593,6 +740,8 @@ export default async function handler(req, res) {
   const requestedImageModel = normalizeImageModelName(DEFAULT_IMAGE_MODEL)
   const imageAttempts = toBoundedInteger(DEFAULT_IMAGE_ATTEMPTS, 1, 1, 3)
   const imageConcurrency = toBoundedInteger(DEFAULT_IMAGE_CONCURRENCY, 4, 1, 8)
+  const imageProvider = normalizeImageProvider(process.env.IMAGE_PROVIDER, openAiApiKey)
+  const openAiImageModel = String(DEFAULT_OPENAI_IMAGE_MODEL || 'gpt-image-1').trim() || 'gpt-image-1'
   const rawImageModelEnv = process.env.GEMINI_IMAGE_MODEL || '(unset)'
   const imageModelCandidates = unique([
     requestedImageModel || 'gemini-2.5-flash-image',
@@ -604,7 +753,7 @@ export default async function handler(req, res) {
 
     if (replaceWord && pairedWordRequest) {
       targetWord = await generateAlternativeWord({
-        apiKey,
+        apiKey: geminiApiKey,
         currentWord: singleWordRequest,
         pairedWord: pairedWordRequest,
         language,
@@ -614,7 +763,10 @@ export default async function handler(req, res) {
     }
 
     const image = await generateWordImage({
-      apiKey,
+      imageProvider,
+      geminiApiKey,
+      openAiApiKey,
+      openAiImageModel,
       word: targetWord,
       language,
       topic,
@@ -637,6 +789,8 @@ export default async function handler(req, res) {
         image && image.error ? image.error : 'no image returned',
       )}`,
       imageDiagnostics: {
+        imageProvider,
+        openAiImageModel,
         rawImageModelEnv,
         normalizedImageModel: requestedImageModel,
         imageModelCandidates,
@@ -650,7 +804,7 @@ export default async function handler(req, res) {
 
   try {
     const { worksheet, usedModel } = await generateWordWorksheet({
-      apiKey,
+      apiKey: geminiApiKey,
       language,
       pairCount,
       topic,
@@ -664,7 +818,10 @@ export default async function handler(req, res) {
     const wordToImage = new Map()
     const imageResults = await mapWithConcurrency(uniqueWords, imageConcurrency, async (word) => {
       const image = await generateWordImage({
-        apiKey,
+        imageProvider,
+        geminiApiKey,
+        openAiApiKey,
+        openAiImageModel,
         word,
         language,
         topic,
@@ -710,7 +867,7 @@ export default async function handler(req, res) {
         pairs: enrichedPairs,
       },
       usedTextModel: usedModel,
-      usedImageModels: imageModelCandidates,
+      usedImageModels: imageProvider === 'openai' ? [openAiImageModel] : imageModelCandidates,
       imageWarning:
         missingWords.length > 0
           ? `Some images could not be generated (${missingWords.length}/${uniqueWords.length}). You can still print the worksheet and refresh individual cards later.${
@@ -720,6 +877,8 @@ export default async function handler(req, res) {
       imageDiagnostics:
         missingWords.length > 0
           ? {
+              imageProvider,
+              openAiImageModel,
               rawImageModelEnv,
               normalizedImageModel: requestedImageModel,
               imageModelCandidates,
