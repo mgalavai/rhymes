@@ -221,8 +221,9 @@
 .sheet-frame {
   min-height: 0;
   display: grid;
-  place-items: center;
-  overflow: hidden;
+  place-items: start center;
+  overflow: auto;
+  padding: 0.55rem;
   border: 1px solid rgb(216 204 179 / 45%);
   border-radius: 12px;
   background: linear-gradient(180deg, rgb(252 246 230 / 60%), rgb(246 236 215 / 36%));
@@ -230,6 +231,8 @@
 
 .worksheet-page,
 .empty-sheet {
+  --pair-count: 5;
+  --icon-size: clamp(5.1rem, calc(11.5rem - (var(--pair-count) * 1rem)), 9.4rem);
   height: 100%;
   width: auto;
   max-width: 100%;
@@ -295,14 +298,13 @@
   padding: 0;
   margin: 0;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3mm;
+  display: grid;
+  grid-template-rows: repeat(var(--pair-count), minmax(0, 1fr));
+  gap: 2.6mm;
 }
 
 .sheet-item {
   min-height: 0;
-  flex: 1 1 0;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
   gap: 1.2mm;
@@ -320,22 +322,26 @@
 
 .item-illustration {
   width: 100%;
+  height: 100%;
   min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .svg-box {
-  width: min(100%, 42mm);
-  height: 100%;
+  width: min(100%, var(--icon-size));
+  height: auto;
+  aspect-ratio: 1 / 1;
   min-height: 0;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: visible;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #fff;
 }
 
 .refresh-image-btn {
@@ -396,7 +402,7 @@
 }
 
 .svg-box img {
-  width: min(100%, 40mm);
+  width: 100%;
   height: 100%;
   max-height: 100%;
   object-fit: contain;
@@ -404,8 +410,8 @@
 }
 
 .image-missing {
-  width: min(100%, 40mm);
-  aspect-ratio: 1 / 1;
+  width: 100%;
+  height: 100%;
   border: 2px dashed #cfbe9a;
   border-radius: 12px;
   display: grid;
@@ -502,7 +508,7 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 10mm;
+    margin: 8mm;
   }
 
   body {
@@ -533,8 +539,10 @@
   }
 
   .worksheet-page {
+    --icon-size: clamp(24mm, calc(44mm - (var(--pair-count) * 3mm)), 35mm);
     width: 100%;
-    height: auto;
+    height: calc(297mm - 16mm);
+    max-height: calc(297mm - 16mm);
     aspect-ratio: auto;
     border: none;
     border-radius: 0;
@@ -543,7 +551,8 @@
     background: #fff;
     display: grid;
     grid-template-rows: auto auto auto;
-    gap: 3mm;
+    gap: 2.2mm;
+    overflow: hidden;
   }
 
   .worksheet-header h2 {
@@ -562,39 +571,39 @@
   .worksheet-columns {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6mm;
+    gap: 4.4mm;
     min-height: 0;
   }
 
   .items-column {
-    display: flex;
-    flex-direction: column;
-    gap: 3mm;
+    display: grid;
+    grid-template-rows: repeat(var(--pair-count), minmax(0, 1fr));
+    gap: 2.4mm;
     min-height: 0;
   }
 
   .sheet-item {
     break-inside: avoid;
     page-break-inside: avoid;
-    min-height: 45mm;
-    height: auto;
+    min-height: 0;
+    height: 100%;
     display: grid;
     grid-template-rows: minmax(0, 1fr) auto;
     gap: 1.5mm;
   }
 
   .item-illustration {
-    height: 30mm;
+    height: 100%;
   }
 
   .svg-box img {
-    width: min(100%, 34mm);
+    width: 100%;
     height: 100%;
     object-fit: contain;
   }
 
   .sheet-item strong {
-    font-size: 14pt;
+    font-size: 12.3pt;
     line-height: 1.08;
   }
 

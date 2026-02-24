@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { type CSSProperties, useState } from 'react'
 import './App.css'
 
 const DEFAULT_MODEL = 'gemini-3.1-pro-preview'
@@ -440,7 +440,10 @@ function App() {
       <main className="workspace">
         <section className="sheet-frame" aria-live="polite">
           {worksheet && cards ? (
-            <article className="worksheet-page">
+            <article
+              className="worksheet-page"
+              style={{ '--pair-count': String(cards.left.length) } as CSSProperties}
+            >
               <div className="worksheet-header">
                 <h2>{worksheet.title}</h2>
                 <p>{worksheet.instruction}</p>

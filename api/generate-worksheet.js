@@ -64,10 +64,12 @@ function buildImagePrompt(word, language, topic, variationHint = '') {
       ? `Create a noticeably different variation than previous versions. Variation hint: ${variationHint}.`
       : 'Create a distinct icon composition and silhouette.',
     'Output requirements:',
-    '- Isolated single object only, transparent background.',
-    '- No scene, no frame, no text, no watermark.',
-    '- Child-friendly educational icon style, clean edges, centered object.',
-    '- Keep full object visible with margin from image edges.',
+    '- Depict exactly the requested word as one centered object.',
+    '- Plain white background only (no transparency).',
+    '- No checkerboard/alpha-grid background and no black background.',
+    '- No scene, no frame, no border, no collage, no text, no watermark.',
+    '- Child-friendly flat clipart style with clean outlines and consistent colors.',
+    '- Keep full object visible with clear margin from image edges.',
     '- 1:1 composition.',
   ].join('\n')
 }
