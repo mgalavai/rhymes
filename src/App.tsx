@@ -14,6 +14,7 @@ const LANGUAGE_OPTIONS = [
   'Hindi',
   'Turkish',
   'Polish',
+  'Swedish',
 ]
 
 const CARD_OPTIONS = [
