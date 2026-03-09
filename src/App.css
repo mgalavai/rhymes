@@ -19,7 +19,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(340px, 430px);
   gap: 1rem;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .workspace {
@@ -118,6 +118,15 @@
   background: #fff;
   color: var(--ink);
   font: inherit;
+}
+
+.control-panel select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23513f29' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.82rem center;
+  background-size: 0.95rem;
+  padding-right: 2.4rem;
 }
 
 .control-panel input:focus-visible,
@@ -276,22 +285,18 @@
 }
 
 .route-v1 .control-panel {
-  border: 1px solid #cbbca1;
-  border-radius: 20px;
-  padding: 1rem;
-  background:
-    linear-gradient(185deg, #f9f3e7 0%, #f1e6d1 100%),
-    radial-gradient(circle at 84% -10%, rgb(212 130 73 / 22%), transparent 56%);
-  box-shadow:
-    0 14px 30px rgb(72 50 18 / 18%),
-    inset 0 1px 0 rgb(255 255 255 / 58%);
-  gap: 0.85rem;
+  border: 0;
+  border-radius: 0;
+  padding: 0.3rem 0.1rem;
+  background: transparent;
+  box-shadow: none;
+  gap: 0.65rem;
 }
 
 .route-v1 .panel-hero {
   border: none;
-  border-radius: 14px;
-  padding: 0.4rem 0.3rem 0.1rem;
+  border-radius: 0;
+  padding: 0.2rem 0.2rem 0;
   background: transparent;
 }
 
@@ -318,7 +323,7 @@
 }
 
 .route-v1 .panel-title {
-  margin-top: 0.2rem;
+  margin-top: 0.12rem;
   font-family: 'Fraunces', serif;
   font-size: 1.08rem;
   font-weight: 600;
@@ -328,8 +333,8 @@
 }
 
 .route-v1 .control-section {
-  border-top: 1px solid rgb(127 96 58 / 16%);
-  padding-top: 0.72rem;
+  border-top: 0;
+  padding-top: 0.24rem;
   gap: 0.48rem;
 }
 
@@ -432,9 +437,874 @@
 .route-v1 .help-text {
   font-size: 0.78rem;
   color: #776449;
-  border-top-style: solid;
-  border-top-color: rgb(132 100 64 / 20%);
-  padding-top: 0.66rem;
+  border-top: 0;
+  padding-top: 0.32rem;
+}
+
+/* ── Route /2 — Milk & Chalk (deep navy + crayon yellow) ── */
+
+.route-v2 .control-panel {
+  border: 0;
+  border-radius: 18px;
+  padding: 1.4rem 1.2rem;
+  background: #1c2540;
+  box-shadow: 0 18px 40px rgb(10 15 35 / 28%);
+  gap: 0.9rem;
+}
+
+.route-v2 .panel-kicker {
+  font-family: 'Sora', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #a8b4d0;
+}
+
+.route-v2 .panel-hero {
+  border: 0;
+  background: transparent;
+  padding: 0.2rem 0 0.1rem;
+}
+
+.route-v2 .panel-hero h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(1.5rem, 2.3vw, 2.1rem);
+  font-weight: 800;
+  color: #f3edd8;
+  letter-spacing: -0.01em;
+  line-height: 1.0;
+}
+
+.route-v2 .panel-hero p {
+  color: #8a97b8;
+  font-size: 0.9rem;
+  margin-top: 0.45rem;
+  font-family: 'Sora', sans-serif;
+  line-height: 1.4;
+}
+
+.route-v2 .panel-title {
+  font-family: 'Sora', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6379a8;
+}
+
+.route-v2 .control-section {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.route-v2 .field-label {
+  font-family: 'Sora', sans-serif;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7d8fb5;
+}
+
+.route-v2 .control-panel input,
+.route-v2 .control-panel select,
+.route-v2 .control-panel button {
+  border-radius: 10px;
+  border: 1.5px solid #2e3d6a;
+  background: #243058;
+  color: #e8e2d4;
+  font-family: 'Sora', sans-serif;
+}
+
+.route-v2 .control-panel input::placeholder {
+  color: #4d5e8a;
+}
+
+.route-v2 .control-panel select {
+  background-color: #243058;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238a97b8' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+.route-v2 .cards-tabs {
+  border: 1.5px solid #2e3d6a;
+  border-radius: 12px;
+  background: #243058;
+  box-shadow: none;
+  padding: 0.2rem;
+}
+
+.route-v2 .cards-tab {
+  border-radius: 9px;
+  border: 1px solid transparent;
+  font-family: 'Sora', sans-serif;
+  font-weight: 700;
+  color: #7d8fb5;
+}
+
+.route-v2 .cards-tab.is-active {
+  background: #f5d86e;
+  border-color: #d4b84a;
+  color: #1c2540;
+  box-shadow: 0 3px 8px rgb(245 216 110 / 28%);
+}
+
+.route-v2 .cards-tab:not(.is-active):hover {
+  background: rgb(255 255 255 / 8%);
+  border-color: #3c4f80;
+  color: #b0bdd8;
+}
+
+.route-v2 .topic-randomize-btn {
+  background: #243058;
+  color: #7d8fb5;
+  border: 1.5px solid #2e3d6a;
+}
+
+.route-v2 .button-row button:first-child {
+  background: #f5d86e;
+  border-color: #d4b84a;
+  color: #1c2540;
+  box-shadow: 0 6px 16px rgb(245 216 110 / 24%);
+}
+
+.route-v2 .button-row button:not(:first-child) {
+  background: transparent;
+  border: 1.5px solid #2e3d6a;
+  color: #7d8fb5;
+}
+
+.route-v2 .button-row button:not(:first-child):disabled {
+  opacity: 0.35;
+}
+
+.route-v2 .help-text {
+  font-family: 'Sora', sans-serif;
+  font-size: 0.74rem;
+  color: #4d5e8a;
+  border-top: 0;
+  padding-top: 0;
+}
+
+.route-v2 .error-box {
+  background: rgb(180 50 50 / 20%);
+  border: 1.5px solid rgb(200 80 80 / 40%);
+  color: #f0a0a0;
+}
+
+.route-v2 .warning-box {
+  background: rgb(180 140 40 / 20%);
+  border: 1.5px solid rgb(200 160 60 / 40%);
+  color: #e8d08a;
+}
+
+/* ── Route /3 — Sunday Paper (newsprint + open layout + warm red) ── */
+
+.route-v3 .control-panel {
+  border: 0;
+  border-top: 2.5px solid #2e2a24;
+  border-radius: 0;
+  padding: 1.2rem 0.8rem;
+  background: transparent;
+  box-shadow: none;
+  gap: 0;
+}
+
+.route-v3 .panel-kicker {
+  font-family: 'Karla', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: #999088;
+  text-transform: uppercase;
+}
+
+.route-v3 .panel-hero {
+  border: 0;
+  border-bottom: 1px solid #c8bfb0;
+  background: transparent;
+  padding: 0.1rem 0 0.9rem;
+  border-radius: 0;
+  margin-bottom: 0.2rem;
+}
+
+.route-v3 .panel-hero h1 {
+  font-family: 'Zilla Slab', serif;
+  font-size: clamp(1.5rem, 2.2vw, 2rem);
+  font-weight: 700;
+  color: #1e1a14;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+}
+
+.route-v3 .panel-hero p {
+  font-family: 'Karla', sans-serif;
+  color: #6b6156;
+  font-size: 0.93rem;
+  margin-top: 0.4rem;
+  line-height: 1.38;
+}
+
+.route-v3 .panel-title {
+  font-family: 'Karla', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #b5a899;
+  margin-bottom: 0.5rem;
+}
+
+.route-v3 .control-section {
+  border-top: 1px solid #dcd3c7;
+  padding-top: 0.7rem;
+  padding-bottom: 0.6rem;
+  gap: 0.4rem;
+}
+
+.route-v3 .control-section:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.route-v3 .field-label {
+  font-family: 'Karla', sans-serif;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7a7060;
+}
+
+.route-v3 .control-panel input,
+.route-v3 .control-panel select,
+.route-v3 .control-panel button {
+  border-radius: 5px;
+  border: 1.5px solid #c8bfb0;
+  background: #faf6f0;
+  color: #2e2a24;
+  font-family: 'Karla', sans-serif;
+}
+
+.route-v3 .control-panel select {
+  background-color: #faf6f0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23807060' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+.route-v3 .cards-tabs {
+  border: 1.5px solid #c8bfb0;
+  border-radius: 5px;
+  background: #faf6f0;
+  box-shadow: none;
+}
+
+.route-v3 .cards-tab {
+  border-radius: 3px;
+  font-family: 'Karla', sans-serif;
+  font-weight: 700;
+  color: #7a7060;
+}
+
+.route-v3 .cards-tab.is-active {
+  background: #c0392b;
+  border-color: #a0311f;
+  color: #fff;
+  box-shadow: none;
+}
+
+.route-v3 .cards-tab:not(.is-active):hover {
+  background: #ede7df;
+  border-color: #b8af9e;
+}
+
+.route-v3 .topic-randomize-btn {
+  background: #faf6f0;
+  color: #7a7060;
+}
+
+.route-v3 .button-row button:first-child {
+  background: #c0392b;
+  border-color: #a0311f;
+  color: #fff;
+  box-shadow: none;
+  font-family: 'Karla', sans-serif;
+}
+
+.route-v3 .button-row button:not(:first-child) {
+  background: transparent;
+  border: 1.5px solid #c8bfb0;
+  color: #7a7060;
+  font-family: 'Karla', sans-serif;
+}
+
+.route-v3 .help-text {
+  font-family: 'Karla', sans-serif;
+  font-size: 0.76rem;
+  color: #b5a899;
+  border-top: 0;
+}
+
+/* ── Route /4 — Craft Table (sage green + sand accent) ── */
+
+.route-v4 .control-panel {
+  border: 0;
+  border-radius: 24px;
+  padding: 1.3rem;
+  background: #e4ede2;
+  box-shadow: 0 12px 30px rgb(80 110 80 / 14%);
+  gap: 0.85rem;
+}
+
+.route-v4 .panel-kicker {
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #7a9e72;
+}
+
+.route-v4 .panel-hero {
+  border: 0;
+  background: transparent;
+  padding: 0.1rem 0 0;
+}
+
+.route-v4 .panel-hero h1 {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(1.5rem, 2.2vw, 2rem);
+  font-weight: 400;
+  color: #2e4a2e;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+}
+
+.route-v4 .panel-hero p {
+  font-family: 'Nunito', sans-serif;
+  color: #5c7858;
+  font-size: 0.92rem;
+  margin-top: 0.42rem;
+  line-height: 1.36;
+}
+
+.route-v4 .panel-title {
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #6a8e62;
+}
+
+.route-v4 .control-section {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.route-v4 .field-label {
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #4a6e44;
+}
+
+.route-v4 .control-panel input,
+.route-v4 .control-panel select,
+.route-v4 .control-panel button {
+  border-radius: 14px;
+  border: 1.5px solid #b8d0b2;
+  background: #ffffff;
+  color: #2e4a2e;
+  font-family: 'Nunito', sans-serif;
+}
+
+.route-v4 .control-panel select {
+  background-color: #ffffff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%234a6e44' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+.route-v4 .cards-tabs {
+  border: 1.5px solid #b8d0b2;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 65%);
+  box-shadow: inset 0 1px 3px rgb(60 100 60 / 8%);
+  padding: 0.22rem;
+}
+
+.route-v4 .cards-tab {
+  border-radius: 12px;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  color: #5a8055;
+}
+
+.route-v4 .cards-tab.is-active {
+  background: #c8962e;
+  border-color: #a87828;
+  color: #fff;
+  box-shadow: 0 3px 8px rgb(150 110 40 / 22%);
+}
+
+.route-v4 .cards-tab:not(.is-active):hover {
+  background: rgb(255 255 255 / 88%);
+  border-color: #b8d0b2;
+}
+
+.route-v4 .topic-randomize-btn {
+  background: #fff;
+  color: #5a8055;
+  border: 1.5px solid #b8d0b2;
+  border-radius: 14px;
+}
+
+.route-v4 .button-row button:first-child {
+  background: #c8962e;
+  border-color: #a87828;
+  color: #fff;
+  box-shadow: 0 6px 14px rgb(150 110 40 / 20%);
+}
+
+.route-v4 .button-row button:not(:first-child) {
+  background: rgb(255 255 255 / 65%);
+  color: #5a8055;
+  border: 1.5px solid #b8d0b2;
+}
+
+.route-v4 .help-text {
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.8rem;
+  color: #7a9e72;
+  border-top: 0;
+}
+
+/* ── Route /5 — Studio Sticky Note (white panel + amber left stripe) ── */
+
+.route-v5 .control-panel {
+  border: 0;
+  border-left: 5px solid #d97706;
+  border-radius: 0 16px 16px 0;
+  padding: 1.2rem 1.1rem;
+  background: #ffffff;
+  box-shadow: 0 8px 28px rgb(0 0 0 / 8%);
+  gap: 0.78rem;
+}
+
+.route-v5 .panel-kicker {
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #d97706;
+}
+
+.route-v5 .panel-hero {
+  border: 0;
+  background: transparent;
+  padding: 0.1rem 0 0;
+}
+
+.route-v5 .panel-hero h1 {
+  font-family: 'Outfit', sans-serif;
+  font-size: clamp(1.4rem, 2.2vw, 2rem);
+  font-weight: 800;
+  color: #1c1712;
+  letter-spacing: -0.02em;
+  line-height: 1.0;
+}
+
+.route-v5 .panel-hero p {
+  font-family: 'Outfit', sans-serif;
+  color: #78716c;
+  font-size: 0.92rem;
+  margin-top: 0.44rem;
+  line-height: 1.36;
+}
+
+.route-v5 .panel-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #a8a29e;
+}
+
+.route-v5 .control-section {
+  border-top: 1px solid #f0ece8;
+  padding-top: 0.7rem;
+  gap: 0.44rem;
+}
+
+.route-v5 .control-section:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.route-v5 .field-label {
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #57534e;
+}
+
+.route-v5 .control-panel input,
+.route-v5 .control-panel select,
+.route-v5 .control-panel button {
+  border-radius: 10px;
+  border: 1.5px solid #e7e3de;
+  background: #faf9f7;
+  color: #1c1712;
+  font-family: 'Outfit', sans-serif;
+}
+
+.route-v5 .control-panel select {
+  background-color: #faf9f7;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2357534e' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+.route-v5 .cards-tabs {
+  border: 1.5px solid #e7e3de;
+  border-radius: 10px;
+  background: #faf9f7;
+  box-shadow: none;
+}
+
+.route-v5 .cards-tab {
+  border-radius: 8px;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  color: #78716c;
+}
+
+.route-v5 .cards-tab.is-active {
+  background: #d97706;
+  border-color: #b45309;
+  color: #fff;
+  box-shadow: 0 3px 8px rgb(180 83 0 / 22%);
+}
+
+.route-v5 .cards-tab:not(.is-active):hover {
+  background: #f0ece8;
+  border-color: #d4cfc9;
+}
+
+.route-v5 .topic-randomize-btn {
+  background: #faf9f7;
+  color: #78716c;
+  border: 1.5px solid #e7e3de;
+}
+
+.route-v5 .button-row button:first-child {
+  background: #d97706;
+  border-color: #b45309;
+  color: #fff;
+  box-shadow: 0 6px 14px rgb(180 83 0 / 18%);
+}
+
+.route-v5 .button-row button:not(:first-child) {
+  background: transparent;
+  border: 1.5px solid #e7e3de;
+  color: #78716c;
+}
+
+.route-v5 .help-text {
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.76rem;
+  color: #a8a29e;
+  border-top: 0;
+}
+
+/* ── Route /6 — Bold Primary (constructivist red + black) ── */
+
+.route-v6 .control-panel {
+  border: 3px solid #1a1410;
+  border-radius: 4px;
+  padding: 1.2rem;
+  background: #faf8f4;
+  box-shadow: 5px 5px 0 #1a1410;
+  gap: 0;
+}
+
+.route-v6 .panel-kicker {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: #c0392b;
+}
+
+.route-v6 .panel-hero {
+  border: 0;
+  border-bottom: 3px solid #1a1410;
+  background: transparent;
+  padding: 0.3rem 0 1rem;
+  border-radius: 0;
+  margin-bottom: 0.1rem;
+}
+
+.route-v6 .panel-hero h1 {
+  font-family: 'Archivo Black', sans-serif;
+  font-size: clamp(1.4rem, 2.2vw, 2rem);
+  font-weight: 400;
+  color: #1a1410;
+  letter-spacing: -0.01em;
+  line-height: 1.0;
+}
+
+.route-v6 .panel-hero p {
+  font-family: 'DM Sans', sans-serif;
+  color: #4e4540;
+  font-size: 0.93rem;
+  margin-top: 0.44rem;
+  line-height: 1.36;
+}
+
+.route-v6 .panel-title {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #9e9088;
+  padding-top: 0.8rem;
+  padding-bottom: 0.5rem;
+}
+
+.route-v6 .control-section {
+  border-top: 1.5px solid #ddd6cc;
+  padding-top: 0.7rem;
+  padding-bottom: 0.5rem;
+  gap: 0.4rem;
+}
+
+.route-v6 .control-section:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.route-v6 .field-label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #1a1410;
+}
+
+.route-v6 .control-panel input,
+.route-v6 .control-panel select,
+.route-v6 .control-panel button {
+  border-radius: 3px;
+  border: 2px solid #1a1410;
+  background: #fff;
+  color: #1a1410;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.route-v6 .control-panel select {
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%231a1410' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+.route-v6 .cards-tabs {
+  border: 2px solid #1a1410;
+  border-radius: 3px;
+  background: #fff;
+  box-shadow: none;
+  gap: 0;
+  padding: 0;
+}
+
+.route-v6 .cards-tab {
+  border-radius: 1px;
+  border: 0;
+  border-right: 1.5px solid #1a1410;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 700;
+  color: #1a1410;
+}
+
+.route-v6 .cards-tab:last-child {
+  border-right: 0;
+}
+
+.route-v6 .cards-tab.is-active {
+  background: #c0392b;
+  color: #fff;
+  box-shadow: none;
+}
+
+.route-v6 .cards-tab:not(.is-active):hover {
+  background: #f2ede8;
+}
+
+.route-v6 .topic-randomize-btn {
+  background: #fff;
+  color: #1a1410;
+  border: 2px solid #1a1410;
+  border-radius: 3px;
+}
+
+.route-v6 .button-row button:first-child {
+  background: #c0392b;
+  border-color: #8e1b12;
+  color: #fff;
+  border-radius: 3px;
+  box-shadow: 3px 3px 0 #8e1b12;
+}
+
+.route-v6 .button-row button:not(:first-child) {
+  background: #fff;
+  border: 2px solid #1a1410;
+  color: #1a1410;
+  border-radius: 3px;
+  box-shadow: 2px 2px 0 #1a1410;
+}
+
+.route-v6 .button-row button:not(:first-child):disabled {
+  opacity: 0.35;
+  box-shadow: none;
+}
+
+.route-v6 .help-text {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.76rem;
+  color: #9e9088;
+  border-top: 0;
+}
+
+/* ── Route /7 — Garden Fresh (morning sage + peach accent) ── */
+
+.route-v7 .control-panel {
+  border: 0;
+  border-radius: 28px;
+  padding: 1.3rem;
+  background: linear-gradient(155deg, #d8f0d0, #c5e6bc);
+  box-shadow: 0 16px 38px rgb(60 120 60 / 16%);
+  gap: 0.88rem;
+}
+
+.route-v7 .panel-kicker {
+  font-family: 'Comfortaa', cursive;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #5a9050;
+}
+
+.route-v7 .panel-hero {
+  border: 0;
+  background: transparent;
+  padding: 0.1rem 0 0;
+}
+
+.route-v7 .panel-hero h1 {
+  font-family: 'Comfortaa', cursive;
+  font-size: clamp(1.35rem, 2.1vw, 1.9rem);
+  font-weight: 700;
+  color: #1e3c1e;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+
+.route-v7 .panel-hero p {
+  font-family: 'Comfortaa', cursive;
+  color: #3e6e3e;
+  font-size: 0.9rem;
+  margin-top: 0.44rem;
+  line-height: 1.38;
+}
+
+.route-v7 .panel-title {
+  font-family: 'Comfortaa', cursive;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6aaa5e;
+}
+
+.route-v7 .control-section {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.route-v7 .field-label {
+  font-family: 'Comfortaa', cursive;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #3e6e3e;
+}
+
+.route-v7 .control-panel input,
+.route-v7 .control-panel select,
+.route-v7 .control-panel button {
+  border-radius: 16px;
+  border: 1.5px solid #a8d098;
+  background: #f2fbf0;
+  color: #1e3c1e;
+  font-family: 'Comfortaa', cursive;
+}
+
+.route-v7 .control-panel select {
+  background-color: #f2fbf0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%233e6e3e' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+.route-v7 .cards-tabs {
+  border: 1.5px solid #a8d098;
+  border-radius: 18px;
+  background: rgb(255 255 255 / 60%);
+  box-shadow: inset 0 1px 3px rgb(40 90 40 / 8%);
+  padding: 0.2rem;
+}
+
+.route-v7 .cards-tab {
+  border-radius: 14px;
+  font-family: 'Comfortaa', cursive;
+  font-weight: 700;
+  color: #4e8044;
+}
+
+.route-v7 .cards-tab.is-active {
+  background: #f47c4c;
+  border-color: #d45c2c;
+  color: #fff;
+  box-shadow: 0 3px 8px rgb(200 80 40 / 24%);
+}
+
+.route-v7 .cards-tab:not(.is-active):hover {
+  background: rgb(255 255 255 / 80%);
+  border-color: #a8d098;
+}
+
+.route-v7 .topic-randomize-btn {
+  background: #f2fbf0;
+  color: #4e8044;
+  border: 1.5px solid #a8d098;
+  border-radius: 16px;
+}
+
+.route-v7 .button-row button:first-child {
+  background: #f47c4c;
+  border-color: #d45c2c;
+  color: #fff;
+  box-shadow: 0 6px 14px rgb(200 80 40 / 22%);
+}
+
+.route-v7 .button-row button:not(:first-child) {
+  background: rgb(255 255 255 / 55%);
+  border: 1.5px solid #a8d098;
+  color: #4e8044;
+}
+
+.route-v7 .help-text {
+  font-family: 'Comfortaa', cursive;
+  font-size: 0.76rem;
+  color: #6aaa5e;
+  border-top: 0;
 }
 
 .sheet-frame {
@@ -442,7 +1312,7 @@
   display: grid;
   place-items: center;
   overflow: auto;
-  padding: 0;
+  padding: 0.75rem;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -724,6 +1594,7 @@
 
   .sheet-frame {
     overflow: visible;
+    padding: 0.45rem 0.2rem;
   }
 
   .worksheet-page,
@@ -776,6 +1647,7 @@
   .sheet-frame {
     display: block;
     overflow: visible;
+    padding: 0;
     border: 0;
     background: transparent;
   }

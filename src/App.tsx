@@ -409,7 +409,15 @@ function toColumnCards(worksheet: WorksheetData): { left: ColumnCard[]; right: C
 }
 
 function App() {
-  const isSidebarV1 = window.location.pathname === '/1'
+  const routeClass = ({
+    '/1': 'route-v1',
+    '/2': 'route-v2',
+    '/3': 'route-v3',
+    '/4': 'route-v4',
+    '/5': 'route-v5',
+    '/6': 'route-v6',
+    '/7': 'route-v7',
+  } as Record<string, string>)[window.location.pathname] ?? ''
   const [language, setLanguage] = useState('English')
   const [pairCount, setPairCount] = useState<PairCountOption>(5)
   const [topic, setTopic] = useState('animals and everyday objects')
@@ -796,7 +804,7 @@ function App() {
     refreshingCardId === card.id || (isHydratingImages && !card.imageDataUrl)
 
   return (
-    <div className={`app-shell ${isSidebarV1 ? 'route-v1' : ''}`}>
+    <div className={`app-shell ${routeClass}`}>
       <main className="workspace">
         <section className="sheet-frame" aria-live="polite">
           {worksheet && cards ? (
