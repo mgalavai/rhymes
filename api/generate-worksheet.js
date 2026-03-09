@@ -5,6 +5,44 @@ const DEFAULT_OPENAI_IMAGE_ATTEMPTS = 1
 const DEFAULT_OPENAI_IMAGE_CONCURRENCY = 8
 const VERBOSE_SHEET_LOGS = true
 
+// ── Rate limiting ──────────────────────────────────────────────────────────
+// Sliding window: max N requests per IP per window (ms).
+const RATE_LIMIT_MAX = 20
+const RATE_LIMIT_WINDOW_MS = 60_000 // 1 minute
+const ipRequestLog = new Map() // ip -> number[]
+
+function isRateLimited(ip) {
+  const now = Date.now()
+  const windowStart = now - RATE_LIMIT_WINDOW_MS
+  const timestamps = (ipRequestLog.get(ip) || []).filter((t) => t > windowStart)
+  if (timestamps.length >= RATE_LIMIT_MAX) {
+    return true
+  }
+  timestamps.push(now)
+  ipRequestLog.set(ip, timestamps)
+  return false
+}
+
+// ── Allowed origins ────────────────────────────────────────────────────────
+const ALLOWED_ORIGIN_PATTERN = /^https?:\/\/(localhost(:\d+)?|[\w-]+\.vercel\.app|(www\.)?rhymes[\w.-]*)$/i
+
+function isAllowedOrigin(origin) {
+  if (!origin) return false
+  return ALLOWED_ORIGIN_PATTERN.test(origin)
+}
+
+// ── Input sanitisation helpers ─────────────────────────────────────────────
+const ALLOWED_LANGUAGES = new Set([
+  'English', 'Spanish', 'French', 'German', 'Italian',
+  'Portuguese', 'Dutch', 'Hindi', 'Turkish', 'Polish', 'Swedish',
+])
+
+function sanitizeText(value, maxLength) {
+  if (typeof value !== 'string') return ''
+  // Strip control characters and trim
+  return value.replace(/[\x00-\x1F\x7F]/g, '').trim().slice(0, maxLength)
+}
+
 const TEXT_MODEL_FALLBACK_ORDER = ['gpt-4.1-mini', 'gpt-4.1-nano', 'gpt-4o-mini']
 
 function normalizeModelName(rawModelName) {
@@ -601,6 +639,23 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed.' })
   }
 
+  // ── Origin check ─────────────────────────────────────────────────────────
+  const origin = req.headers['origin'] || ''
+  if (origin && !isAllowedOrigin(origin)) {
+    logVerbose(requestId, 'reject:origin', { origin })
+    return res.status(403).json({ error: 'Forbidden.' })
+  }
+
+  // ── Rate limit ────────────────────────────────────────────────────────────
+  const clientIp =
+    (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
+    req.socket?.remoteAddress ||
+    'unknown'
+  if (isRateLimited(clientIp)) {
+    logVerbose(requestId, 'reject:rate-limit', { clientIp })
+    return res.status(429).json({ error: 'Too many requests. Please wait a moment.' })
+  }
+
   let body = {}
   try {
     body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {}
@@ -609,17 +664,26 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid JSON body.' })
   }
 
+  // Reject unexpectedly large bodies (belt-and-suspenders; Vercel caps at 4.5 MB)
+  if (JSON.stringify(body).length > 4096) {
+    return res.status(400).json({ error: 'Request body too large.' })
+  }
+
   const openAiApiKey = process.env.OPENAI_API_KEY || ''
-  const language = typeof body.language === 'string' && body.language.trim() ? body.language.trim() : 'English'
-  const topic = typeof body.topic === 'string' ? body.topic.trim() : ''
+
+  // ── Sanitize & validate inputs ────────────────────────────────────────────
+  const rawLanguage = sanitizeText(body.language, 32)
+  const language = ALLOWED_LANGUAGES.has(rawLanguage) ? rawLanguage : 'English'
+
+  const topic = sanitizeText(body.topic, 120)
   const randomizeTopic = body.randomizeTopic === true
   const deferImages = body.deferImages === true
   const parsedPairCount = Number(body.pairCount)
   const pairCount = [3, 4, 5].includes(parsedPairCount) ? parsedPairCount : 5
-  const singleWordRequest = typeof body.word === 'string' ? cleanWord(body.word) : ''
-  const pairedWordRequest = typeof body.pairedWord === 'string' ? cleanWord(body.pairedWord) : ''
+  const singleWordRequest = cleanWord(sanitizeText(body.word, 60))
+  const pairedWordRequest = cleanWord(sanitizeText(body.pairedWord, 60))
   const replaceWord = body.replaceWord === true
-  const variationHint = typeof body.variationHint === 'string' ? body.variationHint.trim() : ''
+  const variationHint = sanitizeText(body.variationHint, 80)
   const imageProvider = 'openai'
   const openAiImageModel = DEFAULT_OPENAI_IMAGE_MODEL
   const openAiTopicModel = DEFAULT_OPENAI_TOPIC_MODEL
