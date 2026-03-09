@@ -409,6 +409,7 @@ function toColumnCards(worksheet: WorksheetData): { left: ColumnCard[]; right: C
 }
 
 function App() {
+  const isSidebarV1 = window.location.pathname === '/1'
   const [language, setLanguage] = useState('English')
   const [pairCount, setPairCount] = useState<PairCountOption>(5)
   const [topic, setTopic] = useState('animals and everyday objects')
@@ -795,7 +796,7 @@ function App() {
     refreshingCardId === card.id || (isHydratingImages && !card.imageDataUrl)
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${isSidebarV1 ? 'route-v1' : ''}`}>
       <main className="workspace">
         <section className="sheet-frame" aria-live="polite">
           {worksheet && cards ? (
@@ -891,6 +892,7 @@ function App() {
 
       <aside className="control-panel no-print">
         <header className="panel-hero">
+          <p className="panel-kicker">Print Lab</p>
           <h1>Rhyming Sheet Builder</h1>
           <p>
             Generate one printable worksheet with {pairCount * 2} illustrated cards. Kids draw
@@ -900,76 +902,84 @@ function App() {
 
         <h2 className="panel-title">Worksheet Controls</h2>
 
-        <label>
-          Language
-          <select value={language} onChange={(event) => setLanguage(event.target.value)}>
-            {LANGUAGE_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </label>
+        <section className="control-section" aria-labelledby="language-label">
+          <label className="control-field" id="language-label">
+            <span className="field-label">Language</span>
+            <select value={language} onChange={(event) => setLanguage(event.target.value)}>
+              {LANGUAGE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+        </section>
 
-        <label>
-          Cards
-          <div className="cards-tabs" role="tablist" aria-label="Cards per worksheet">
-            {CARD_OPTIONS.map((option) => {
-              const isActive = pairCount === option.pairs
-              return (
-                <button
-                  key={option.pairs}
-                  type="button"
-                  role="tab"
-                  aria-selected={isActive}
-                  className={`cards-tab ${isActive ? 'is-active' : ''}`}
-                  onClick={() => setPairCount(option.pairs)}
-                >
-                  {option.label}
-                </button>
-              )
-            })}
-          </div>
-        </label>
+        <section className="control-section" aria-labelledby="cards-label">
+          <label className="control-field" id="cards-label">
+            <span className="field-label">Cards</span>
+            <div className="cards-tabs" role="tablist" aria-label="Cards per worksheet">
+              {CARD_OPTIONS.map((option) => {
+                const isActive = pairCount === option.pairs
+                return (
+                  <button
+                    key={option.pairs}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    className={`cards-tab ${isActive ? 'is-active' : ''}`}
+                    onClick={() => setPairCount(option.pairs)}
+                  >
+                    {option.label}
+                  </button>
+                )
+              })}
+            </div>
+          </label>
+        </section>
 
-        <label className="topic-field">
-          Topic
-          <div className="topic-input-wrap">
-            <input
-              value={topic}
-              onChange={(event) => setTopic(event.target.value)}
-              placeholder="animals, fruits, home objects"
-            />
-            <button
-              type="button"
-              className={`topic-randomize-btn ${isRandomizingTopic ? 'is-loading' : ''}`}
-              onClick={() => void handleRandomizeTopic()}
-              disabled={isLoading || isRandomizingTopic}
-              aria-label="Randomize topic with AI"
-              title="Randomize topic with AI"
-            >
-              <DiceIcon />
+        <section className="control-section" aria-labelledby="topic-label">
+          <label className="control-field topic-field" id="topic-label">
+            <span className="field-label">Topic</span>
+            <div className="topic-input-wrap">
+              <input
+                value={topic}
+                onChange={(event) => setTopic(event.target.value)}
+                placeholder="animals, fruits, home objects"
+              />
+              <button
+                type="button"
+                className={`topic-randomize-btn ${isRandomizingTopic ? 'is-loading' : ''}`}
+                onClick={() => void handleRandomizeTopic()}
+                disabled={isLoading || isRandomizingTopic}
+                aria-label="Randomize topic with AI"
+                title="Randomize topic with AI"
+              >
+                <DiceIcon />
+              </button>
+            </div>
+          </label>
+        </section>
+
+        <section className="control-section control-actions" aria-label="Worksheet actions">
+          <div className="button-row">
+            <button type="button" onClick={handleGenerate} disabled={isLoading}>
+              {isLoading
+                ? 'Generating words…'
+                : isHydratingImages
+                  ? 'Generating images…'
+                  : worksheet
+                    ? 'Generate New Page'
+                    : 'Generate Page'}
+            </button>
+            <button type="button" onClick={handleRegenerate} disabled={isLoading || !worksheet}>
+              Regenerate
+            </button>
+            <button type="button" onClick={() => window.print()} disabled={!worksheet}>
+              Save as PDF
             </button>
           </div>
-        </label>
-
-        <div className="button-row">
-          <button type="button" onClick={handleGenerate} disabled={isLoading}>
-            {isLoading
-              ? 'Generating words…'
-              : isHydratingImages
-                ? 'Generating images…'
-                : worksheet
-                  ? 'Generate New Page'
-                  : 'Generate Page'}
-          </button>
-          <button type="button" onClick={handleRegenerate} disabled={isLoading || !worksheet}>
-            Regenerate
-          </button>
-          <button type="button" onClick={() => window.print()} disabled={!worksheet}>
-            Save as PDF
-          </button>
-        </div>
+        </section>
 
         {error ? <p className="error-box">{error}</p> : null}
         {!error && warning ? (
