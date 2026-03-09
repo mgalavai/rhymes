@@ -359,11 +359,19 @@
   border-radius: 12px;
 }
 
-.route-v1 .control-panel input,
-.route-v1 .control-panel select {
+.route-v1 .control-panel input {
   background: linear-gradient(180deg, #fffefa, #fff8ec);
   color: #2f271a;
   padding: 0.62rem 0.68rem;
+}
+
+.route-v1 .control-panel select {
+  background-color: #fff8ec;
+  background-repeat: no-repeat;
+  background-position: right 0.82rem center;
+  background-size: 0.95rem;
+  color: #2f271a;
+  padding: 0.62rem 2.4rem 0.62rem 0.68rem;
 }
 
 .route-v1 .cards-tabs {
@@ -511,7 +519,7 @@
 .route-v2 .control-panel button {
   border-radius: 10px;
   border: 1.5px solid #2e3d6a;
-  background: #243058;
+  background-color: #243058;
   color: #e8e2d4;
   font-family: 'Sora', sans-serif;
 }
@@ -680,7 +688,7 @@
 .route-v3 .control-panel button {
   border-radius: 5px;
   border: 1.5px solid #c8bfb0;
-  background: #faf6f0;
+  background-color: #faf6f0;
   color: #2e2a24;
   font-family: 'Karla', sans-serif;
 }
@@ -813,7 +821,7 @@
 .route-v4 .control-panel button {
   border-radius: 14px;
   border: 1.5px solid #b8d0b2;
-  background: #ffffff;
+  background-color: #ffffff;
   color: #2e4a2e;
   font-family: 'Nunito', sans-serif;
 }
@@ -954,7 +962,7 @@
 .route-v5 .control-panel button {
   border-radius: 10px;
   border: 1.5px solid #e7e3de;
-  background: #faf9f7;
+  background-color: #faf9f7;
   color: #1c1712;
   font-family: 'Outfit', sans-serif;
 }
@@ -1098,7 +1106,7 @@
 .route-v6 .control-panel button {
   border-radius: 3px;
   border: 2px solid #1a1410;
-  background: #fff;
+  background-color: #fff;
   color: #1a1410;
   font-family: 'DM Sans', sans-serif;
 }
@@ -1243,7 +1251,7 @@
 .route-v7 .control-panel button {
   border-radius: 16px;
   border: 1.5px solid #a8d098;
-  background: #f2fbf0;
+  background-color: #f2fbf0;
   color: #1e3c1e;
   font-family: 'Comfortaa', cursive;
 }

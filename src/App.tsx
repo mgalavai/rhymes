@@ -417,7 +417,7 @@ function App() {
     '/5': 'route-v5',
     '/6': 'route-v6',
     '/7': 'route-v7',
-  } as Record<string, string>)[window.location.pathname] ?? ''
+  } as Record<string, string>)[window.location.pathname] ?? 'route-v3'
   const [language, setLanguage] = useState('English')
   const [pairCount, setPairCount] = useState<PairCountOption>(5)
   const [topic, setTopic] = useState('animals and everyday objects')
