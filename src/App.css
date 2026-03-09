@@ -1311,6 +1311,7 @@
 
 .sheet-frame {
   min-height: 0;
+  container-type: size;
   display: grid;
   place-items: center;
   overflow: auto;
@@ -1324,9 +1325,8 @@
 .empty-sheet {
   --pair-count: 5;
   --icon-size: clamp(7.2rem, calc(14rem - (var(--pair-count) * 0.9rem)), 10.8rem);
-  height: 100%;
-  width: auto;
-  max-width: 100%;
+  width: min(100cqw, calc(100cqh * 210 / 297));
+  height: auto;
   aspect-ratio: 210 / 297;
   background: var(--paper);
   border: 1px solid #d7cfbd;
