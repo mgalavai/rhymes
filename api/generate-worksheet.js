@@ -188,6 +188,63 @@ function extractJsonText(rawText) {
   throw new Error('Could not parse JSON from the model response.')
 }
 
+function summarizeCandidate(value, maxLength = 240) {
+  if (value === null || value === undefined) {
+    return '(empty)'
+  }
+
+  const text =
+    typeof value === 'string'
+      ? value
+      : (() => {
+          try {
+            return JSON.stringify(value)
+          } catch {
+            return String(value)
+          }
+        })()
+
+  return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text
+}
+
+function extractOpenAiMessageText(message) {
+  if (!message || typeof message !== 'object') {
+    return ''
+  }
+
+  if (typeof message.content === 'string') {
+    return message.content.trim()
+  }
+
+  if (Array.isArray(message.content)) {
+    const joined = message.content
+      .map((part) => {
+        if (typeof part === 'string') {
+          return part
+        }
+
+        if (part && typeof part.text === 'string') {
+          return part.text
+        }
+
+        if (part && typeof part.content === 'string') {
+          return part.content
+        }
+
+        return ''
+      })
+      .filter(Boolean)
+      .join('\n')
+      .trim()
+
+    if (joined) {
+      return joined
+    }
+  }
+
+  return ''
+}
+
 function cleanWord(rawWord) {
   if (typeof rawWord !== 'string') {
     return 'word'
@@ -202,13 +259,87 @@ function cleanWord(rawWord) {
   return cleaned || 'word'
 }
 
-function normalizeWordWorksheet(candidate, language, pairCount) {
-  if (!candidate || typeof candidate !== 'object') {
-    throw new Error('Model returned an unexpected worksheet format.')
+function parseWorksheetCandidate(candidate) {
+  if (typeof candidate === 'string') {
+    return JSON.parse(extractJsonText(candidate))
   }
 
-  const raw = candidate
-  const rawPairs = Array.isArray(raw.pairs) ? raw.pairs : []
+  return candidate
+}
+
+function pickWorksheetRoot(candidate) {
+  const parsed = parseWorksheetCandidate(candidate)
+
+  if (Array.isArray(parsed)) {
+    return {
+      pairs: parsed,
+    }
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error(
+      `Model returned an unexpected worksheet format. Received: ${summarizeCandidate(candidate)}.`,
+    )
+  }
+
+  const wrapperKeys = ['worksheet', 'result', 'data', 'output']
+  for (const key of wrapperKeys) {
+    const wrapped = parsed[key]
+    if (wrapped && typeof wrapped === 'object') {
+      if (Array.isArray(wrapped)) {
+        return { pairs: wrapped }
+      }
+
+      if (
+        Array.isArray(wrapped.pairs) ||
+        Array.isArray(wrapped.wordPairs) ||
+        Array.isArray(wrapped.items)
+      ) {
+        return wrapped
+      }
+    }
+  }
+
+  return parsed
+}
+
+function extractWorksheetPairs(root) {
+  if (Array.isArray(root)) {
+    return root
+  }
+
+  const pairCollections = [root.pairs, root.wordPairs, root.items, root.results, root.rows]
+  const found = pairCollections.find((value) => Array.isArray(value))
+  return Array.isArray(found) ? found : []
+}
+
+function extractWordValue(value) {
+  if (typeof value === 'string') {
+    return value
+  }
+
+  if (Array.isArray(value)) {
+    return extractWordValue(value[0])
+  }
+
+  if (value && typeof value === 'object') {
+    return (
+      value.word ||
+      value.text ||
+      value.label ||
+      value.name ||
+      value.noun ||
+      value.value ||
+      ''
+    )
+  }
+
+  return ''
+}
+
+function normalizeWordWorksheet(candidate, language, pairCount) {
+  const raw = pickWorksheetRoot(candidate)
+  const rawPairs = extractWorksheetPairs(raw)
 
   if (rawPairs.length < pairCount) {
     throw new Error(`Model returned only ${rawPairs.length} pairs. Try regenerate.`)
@@ -216,6 +347,7 @@ function normalizeWordWorksheet(candidate, language, pairCount) {
 
   const pairs = rawPairs.slice(0, pairCount).map((entry, index) => {
     const pair = entry || {}
+    const pairArray = Array.isArray(pair) ? pair : null
 
     return {
       rhymeSound:
@@ -223,10 +355,30 @@ function normalizeWordWorksheet(candidate, language, pairCount) {
           ? pair.rhymeSound.trim()
           : `pair ${index + 1}`,
       left: {
-        word: cleanWord(pair.leftWord || (pair.left && pair.left.word)),
+        word: cleanWord(
+          extractWordValue(
+            pair.leftWord ||
+              pair.word1 ||
+              pair.a ||
+              pair.first ||
+              (pair.left && pair.left.word) ||
+              pair.left ||
+              (pairArray ? pairArray[0] : ''),
+          ),
+        ),
       },
       right: {
-        word: cleanWord(pair.rightWord || (pair.right && pair.right.word)),
+        word: cleanWord(
+          extractWordValue(
+            pair.rightWord ||
+              pair.word2 ||
+              pair.b ||
+              pair.second ||
+              (pair.right && pair.right.word) ||
+              pair.right ||
+              (pairArray ? pairArray[1] : ''),
+          ),
+        ),
       },
     }
   })
@@ -343,7 +495,7 @@ async function callOpenAiTextModel({ apiKey, model, prompt }) {
     },
     body: JSON.stringify({
       model,
-      temperature: 0.9,
+      temperature: 0.4,
       response_format: { type: 'json_object' },
       messages: [
         {
@@ -412,20 +564,19 @@ async function generateWordWorksheet({ apiKey, language, pairCount, topic, candi
     }
 
     try {
-      const modelText =
+      const modelText = extractOpenAiMessageText(
         payload &&
-        payload.choices &&
-        payload.choices[0] &&
-        payload.choices[0].message &&
-        typeof payload.choices[0].message.content === 'string'
-          ? payload.choices[0].message.content
-          : ''
+          payload.choices &&
+          payload.choices[0] &&
+          payload.choices[0].message
+          ? payload.choices[0].message
+          : null,
+      )
       if (!modelText) {
         throw new Error('OpenAI did not return worksheet content.')
       }
 
-      const worksheetJson = JSON.parse(extractJsonText(modelText))
-      const worksheet = normalizeWordWorksheet(worksheetJson, language, pairCount)
+      const worksheet = normalizeWordWorksheet(modelText, language, pairCount)
 
       return {
         worksheet,
@@ -433,6 +584,16 @@ async function generateWordWorksheet({ apiKey, language, pairCount, topic, candi
       }
     } catch (error) {
       lastErrorMessage = error instanceof Error ? error.message : 'Invalid JSON returned from model.'
+      logVerbose('worksheet-parse', 'openai-text:invalid-shape', {
+        modelName,
+        error: lastErrorMessage,
+        responseSnippet: summarizeCandidate(
+          payload && payload.choices && payload.choices[0] && payload.choices[0].message
+            ? payload.choices[0].message
+            : payload,
+          420,
+        ),
+      })
     }
   }
 
@@ -466,14 +627,14 @@ async function generateAlternativeWord({
     }
 
     try {
-      const modelText =
+      const modelText = extractOpenAiMessageText(
         payload &&
-        payload.choices &&
-        payload.choices[0] &&
-        payload.choices[0].message &&
-        typeof payload.choices[0].message.content === 'string'
-          ? payload.choices[0].message.content
-          : ''
+          payload.choices &&
+          payload.choices[0] &&
+          payload.choices[0].message
+          ? payload.choices[0].message
+          : null,
+      )
       if (!modelText) {
         continue
       }
@@ -513,13 +674,14 @@ async function generateRandomTopicWithOpenAi({
   }
 
   const messageText =
-    payload &&
-    payload.choices &&
-    payload.choices[0] &&
-    payload.choices[0].message &&
-    typeof payload.choices[0].message.content === 'string'
-      ? payload.choices[0].message.content
-      : ''
+    extractOpenAiMessageText(
+      payload &&
+        payload.choices &&
+        payload.choices[0] &&
+        payload.choices[0].message
+        ? payload.choices[0].message
+        : null,
+    )
 
   if (!messageText) {
     throw new Error('OpenAI did not return topic content.')

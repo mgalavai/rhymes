@@ -166,6 +166,28 @@ function cleanWord(rawWord: unknown): string {
   return cleaned || 'word'
 }
 
+function extractJsonText(rawText: string): string {
+  const trimmed = rawText.trim()
+
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    return trimmed
+  }
+
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]+?)\s*```/i)
+  if (fenced?.[1]) {
+    return fenced[1].trim()
+  }
+
+  const firstBrace = trimmed.indexOf('{')
+  const lastBrace = trimmed.lastIndexOf('}')
+
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    return trimmed.slice(firstBrace, lastBrace + 1)
+  }
+
+  throw new Error('Could not parse JSON from the worksheet response.')
+}
+
 function sanitizeImageDataUrl(rawValue: unknown): string {
   if (typeof rawValue !== 'string') {
     return ''
@@ -197,20 +219,68 @@ function isRetryableHydrationError(message: string): boolean {
   return /rate limit|throttl|quota exceeded|retry in|429|resource exhausted/i.test(message)
 }
 
+function parseWorksheetCandidate(candidate: unknown): unknown {
+  if (typeof candidate === 'string') {
+    return JSON.parse(extractJsonText(candidate))
+  }
+
+  return candidate
+}
+
+function extractWordValue(value: unknown): string {
+  if (typeof value === 'string') {
+    return value
+  }
+
+  if (Array.isArray(value)) {
+    return extractWordValue(value[0])
+  }
+
+  if (value && typeof value === 'object') {
+    const candidate = value as Record<string, unknown>
+    return (
+      (typeof candidate.word === 'string' && candidate.word) ||
+      (typeof candidate.text === 'string' && candidate.text) ||
+      (typeof candidate.label === 'string' && candidate.label) ||
+      (typeof candidate.name === 'string' && candidate.name) ||
+      ''
+    )
+  }
+
+  return ''
+}
+
 function normalizeWorksheet(candidate: unknown, language: string, pairCount: number): WorksheetData {
-  if (!candidate || typeof candidate !== 'object') {
+  const parsed = parseWorksheetCandidate(candidate)
+  const root =
+    parsed &&
+    typeof parsed === 'object' &&
+    'worksheet' in parsed &&
+    parsed.worksheet &&
+    typeof parsed.worksheet === 'object'
+      ? parsed.worksheet
+      : parsed
+
+  if (!root || typeof root !== 'object') {
     throw new Error('Model returned an unexpected worksheet format.')
   }
 
-  const raw = candidate as Record<string, unknown>
-  const rawPairs = Array.isArray(raw.pairs) ? raw.pairs : []
+  const raw = root as Record<string, unknown>
+  const rawPairs = Array.isArray(raw.pairs)
+    ? raw.pairs
+    : Array.isArray(raw.wordPairs)
+      ? raw.wordPairs
+      : Array.isArray(raw.items)
+        ? raw.items
+        : []
 
   if (rawPairs.length < pairCount) {
     throw new Error(`Model returned only ${rawPairs.length} pairs. Try regenerate.`)
   }
 
   const pairs: RhymePair[] = rawPairs.slice(0, pairCount).map((entry, index) => {
-    const pair = entry as Record<string, unknown>
+    const pair = (entry ?? {}) as Record<string, unknown>
+    const pairArray = Array.isArray(pair) ? pair : null
     const left = (pair.left ?? {}) as Record<string, unknown>
     const right = (pair.right ?? {}) as Record<string, unknown>
 
@@ -220,12 +290,20 @@ function normalizeWorksheet(candidate: unknown, language: string, pairCount: num
           ? pair.rhymeSound.trim()
           : `pair ${index + 1}`,
       left: {
-        word: cleanWord(left.word),
+        word: cleanWord(
+          extractWordValue(
+            pair.leftWord ?? pair.word1 ?? pair.a ?? pair.first ?? left.word ?? pair.left ?? pairArray?.[0],
+          ),
+        ),
         imageDataUrl: sanitizeImageDataUrl(left.imageDataUrl),
         mimeType: typeof left.mimeType === 'string' ? left.mimeType : undefined,
       },
       right: {
-        word: cleanWord(right.word),
+        word: cleanWord(
+          extractWordValue(
+            pair.rightWord ?? pair.word2 ?? pair.b ?? pair.second ?? right.word ?? pair.right ?? pairArray?.[1],
+          ),
+        ),
         imageDataUrl: sanitizeImageDataUrl(right.imageDataUrl),
         mimeType: typeof right.mimeType === 'string' ? right.mimeType : undefined,
       },
