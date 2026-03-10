@@ -259,6 +259,19 @@ function cleanWord(rawWord) {
   return cleaned || 'word'
 }
 
+function cleanOptionalWord(rawWord) {
+  if (typeof rawWord !== 'string') {
+    return ''
+  }
+
+  const trimmed = rawWord.trim()
+  if (!trimmed) {
+    return ''
+  }
+
+  return cleanWord(trimmed)
+}
+
 function parseWorksheetCandidate(candidate) {
   if (typeof candidate === 'string') {
     return JSON.parse(extractJsonText(candidate))
@@ -842,8 +855,8 @@ export default async function handler(req, res) {
   const deferImages = body.deferImages === true
   const parsedPairCount = Number(body.pairCount)
   const pairCount = [3, 4, 5].includes(parsedPairCount) ? parsedPairCount : 5
-  const singleWordRequest = cleanWord(sanitizeText(body.word, 60))
-  const pairedWordRequest = cleanWord(sanitizeText(body.pairedWord, 60))
+  const singleWordRequest = cleanOptionalWord(sanitizeText(body.word, 60))
+  const pairedWordRequest = cleanOptionalWord(sanitizeText(body.pairedWord, 60))
   const replaceWord = body.replaceWord === true
   const variationHint = sanitizeText(body.variationHint, 80)
   const imageProvider = 'openai'
