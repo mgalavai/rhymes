@@ -23,3 +23,12 @@ input,
 select {
   font-family: inherit;
 }
+
+/* No rubber-band bounce or swipe-to-go-back when a trackpad scroll or pan hits
+   an edge. Mouse and trackpad only: touch devices keep pull-to-refresh. */
+@media (pointer: fine) {
+  html,
+  body {
+    overscroll-behavior: none;
+  }
+}
